@@ -1,0 +1,109 @@
+19/01/06 00:08:25 INFO terasort.TeraSort: starting
+19/01/06 00:08:26 INFO input.FileInputFormat: Total input paths to process : 32
+Spent 214ms computing base-splits.
+Spent 8ms computing TeraScheduler splits.
+Computing input splits took 224ms
+Sampling 10 splits of 32
+Making 32 from 10000 sampled records
+Computing parititions took 450ms
+Spent 677ms computing partitions.
+19/01/06 00:08:27 INFO client.RMProxy: Connecting to ResourceManager at hadoop1/192.168.40.129:8032
+19/01/06 00:08:27 INFO mapreduce.JobSubmitter: number of splits:32
+19/01/06 00:08:27 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1546761780464_0002
+19/01/06 00:08:28 INFO impl.YarnClientImpl: Submitted application application_1546761780464_0002
+19/01/06 00:08:28 INFO mapreduce.Job: The url to track the job: http://hadoop1:8088/proxy/application_1546761780464_0002/
+19/01/06 00:08:28 INFO mapreduce.Job: Running job: job_1546761780464_0002
+19/01/06 00:08:34 INFO mapreduce.Job: Job job_1546761780464_0002 running in uber mode : false
+19/01/06 00:08:34 INFO mapreduce.Job:  map 0% reduce 0%
+19/01/06 00:09:42 INFO mapreduce.Job:  map 3% reduce 0%
+19/01/06 00:09:45 INFO mapreduce.Job:  map 6% reduce 0%
+19/01/06 00:10:41 INFO mapreduce.Job:  map 18% reduce 0%
+19/01/06 00:10:49 INFO mapreduce.Job:  map 23% reduce 0%
+19/01/06 00:10:51 INFO mapreduce.Job:  map 24% reduce 0%
+19/01/06 00:10:57 INFO mapreduce.Job:  map 28% reduce 0%
+19/01/06 00:11:03 INFO mapreduce.Job:  map 31% reduce 0%
+19/01/06 00:11:06 INFO mapreduce.Job:  map 33% reduce 0%
+19/01/06 00:11:09 INFO mapreduce.Job:  map 40% reduce 0%
+19/01/06 00:11:11 INFO mapreduce.Job:  map 41% reduce 0%
+19/01/06 00:11:18 INFO mapreduce.Job:  map 44% reduce 0%
+19/01/06 00:13:13 INFO mapreduce.Job:  map 51% reduce 0%
+19/01/06 00:13:15 INFO mapreduce.Job:  map 59% reduce 0%
+19/01/06 00:13:16 INFO mapreduce.Job:  map 69% reduce 0%
+19/01/06 00:13:30 INFO mapreduce.Job:  map 69% reduce 2%
+19/01/06 00:13:47 INFO mapreduce.Job:  map 75% reduce 2%
+19/01/06 00:14:02 INFO mapreduce.Job:  map 81% reduce 2%
+19/01/06 00:14:04 INFO mapreduce.Job:  map 81% reduce 3%
+19/01/06 00:14:13 INFO mapreduce.Job:  map 84% reduce 3%
+19/01/06 00:14:25 INFO mapreduce.Job:  map 84% reduce 4%
+19/01/06 00:14:50 INFO mapreduce.Job:  map 91% reduce 8%
+19/01/06 00:14:51 INFO mapreduce.Job:  map 100% reduce 8%
+19/01/06 00:14:56 INFO mapreduce.Job:  map 100% reduce 28%
+19/01/06 00:15:17 INFO mapreduce.Job:  map 100% reduce 34%
+19/01/06 00:15:18 INFO mapreduce.Job:  map 100% reduce 38%
+19/01/06 00:15:23 INFO mapreduce.Job:  map 100% reduce 50%
+19/01/06 00:15:24 INFO mapreduce.Job:  map 100% reduce 56%
+19/01/06 00:15:38 INFO mapreduce.Job:  map 100% reduce 59%
+19/01/06 00:15:43 INFO mapreduce.Job:  map 100% reduce 63%
+19/01/06 00:15:45 INFO mapreduce.Job:  map 100% reduce 66%
+19/01/06 00:15:47 INFO mapreduce.Job:  map 100% reduce 75%
+19/01/06 00:15:50 INFO mapreduce.Job:  map 100% reduce 78%
+19/01/06 00:15:51 INFO mapreduce.Job:  map 100% reduce 91%
+19/01/06 00:15:53 INFO mapreduce.Job:  map 100% reduce 100%
+19/01/06 00:15:58 INFO mapreduce.Job: Job job_1546761780464_0002 completed successfully
+19/01/06 00:15:59 INFO mapreduce.Job: Counters: 49
+	File System Counters
+		FILE: Number of bytes read=3339104
+		FILE: Number of bytes written=12725516
+		FILE: Number of read operations=0
+		FILE: Number of large read operations=0
+		FILE: Number of write operations=0
+		HDFS: Number of bytes read=3203840
+		HDFS: Number of bytes written=3200000
+		HDFS: Number of read operations=192
+		HDFS: Number of large read operations=0
+		HDFS: Number of write operations=64
+	Job Counters
+		Launched map tasks=32
+		Launched reduce tasks=32
+		Data-local map tasks=32
+		Total time spent by all maps in occupied slots (ms)=3807162
+		Total time spent by all reduces in occupied slots (ms)=1937135
+		Total time spent by all map tasks (ms)=3807162
+		Total time spent by all reduce tasks (ms)=1937135
+		Total vcore-seconds taken by all map tasks=3807162
+		Total vcore-seconds taken by all reduce tasks=1937135
+		Total megabyte-seconds taken by all map tasks=3898533888
+		Total megabyte-seconds taken by all reduce tasks=1983626240
+	Map-Reduce Framework
+		Map input records=32000
+		Map output records=32000
+		Map output bytes=3264000
+		Map output materialized bytes=3334144
+		Input split bytes=3840
+		Combine input records=0
+		Combine output records=0
+		Reduce input groups=32000
+		Reduce shuffle bytes=3334144
+		Reduce input records=32000
+		Reduce output records=32000
+		Spilled Records=64000
+		Shuffled Maps =1024
+		Failed Shuffles=0
+		Merged Map outputs=1024
+		GC time elapsed (ms)=88302
+		CPU time spent (ms)=74470
+		Physical memory (bytes) snapshot=8177266688
+		Virtual memory (bytes) snapshot=124131115008
+		Total committed heap usage (bytes)=4920049664
+	Shuffle Errors
+		BAD_ID=0
+		CONNECTION=0
+		IO_ERROR=0
+		WRONG_LENGTH=0
+		WRONG_MAP=0
+		WRONG_REDUCE=0
+	File Input Format Counters
+		Bytes Read=3200000
+	File Output Format Counters
+		Bytes Written=3200000
+19/01/06 00:15:59 INFO terasort.TeraSort: done

@@ -1,0 +1,2987 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <title>System monitor report of HadoopPagerank</title>
+    <style TYPE="text/css">
+      .highcharts-tooltip>span {
+	background: rgba(255,255,255,0.85);
+	border: 1px solid silver;
+	border-radius: 3px;
+	box-shadow: 1px 1px 2px #888;
+	padding: 8px;
+	z-index: 2;
+      }
+    </style>
+    <script type='text/javascript' src='https://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.7.2.min.js'></script>
+    <script src="http://code.highcharts.com/highcharts.js"></script>
+    <script src="http://code.highcharts.com/modules/data.js"></script>
+    <script src="http://code.highcharts.com/modules/heatmap.js"></script>
+    <script src="http://code.highcharts.com/modules/exporting.js"></script>
+
+    <script type='text/javascript'>
+    Object.defineProperty(Number.prototype,'fileSize',{value:function(a,b,c,d){
+	return (a=a?[1e3,'k','B']:[1024,'K','iB'],b=Math,c=b.log,
+		d=c(this)/c(a[0])|0,this/b.pow(a[0],d)).toFixed(2)
+	    +(d?(a[1]+'MGTPEZY')[--d]+a[2]:'Bytes');
+    },writable:false,enumerable:false});
+
+    function parse_events(){
+	var data = document.getElementById("csv_events").innerHTML;
+	var events=[];
+	var csv_header = [];
+	$.each(data.split('\n'), function(lineNo, line){
+	    var items = line.split(',');
+	    if (lineNo==0){
+		$.each(items, function(itemNo, item){
+		    csv_header.push(item);
+		});
+	    }else {
+		value = [];
+		$.each(items, function(itemNo, item){
+		    if (itemNo == 0){ // 0 -> timestamp
+			item = parseFloat(item);
+		    }
+//		    value[csv_header[itemNo]] = item;
+		    value.push(item);
+		});
+		events.push({color: 'red',
+			     dashStyle: 'longdashdot',
+			     value: value[0],
+			     label:{
+				 useHTML: true,
+				 text:value[1],
+				 align:'left'
+			     },
+			     width: 2});
+	    }
+	});
+	return events;
+    }
+
+function merge_options(obj1,obj2){
+    var obj3 = {};
+    for (var attrname in obj1) { obj3[attrname] = obj1[attrname]; }
+    for (var attrname in obj2) { obj3[attrname] = obj2[attrname]; }
+    return obj3;
+}
+
+function gen_overall_options(suffix, title, yAxis_desc, plot_options, plot_events, chart_type){
+    var data = document.getElementById("csv_"+suffix).innerHTML;
+    var csv_header = [];
+	
+    var series=[];
+    var yaxis=0;
+    $.each(data.split('\n'), function(lineNo, line){
+	var items = line.split(',');
+	if (lineNo==0){
+	    $.each(items, function(itemNo, item){
+		if (item[0]=='|'){ // new axis
+		    item = item.substring(1);
+		    yaxis +=1;
+		}
+		csv_header.push(item);
+		series.push({name:item, yAxis: yaxis, data:[],
+			     tooltip: yAxis_desc[yaxis].tooltip
+			    })
+	    });
+	} else {
+	    $.each(items, function(itemNo, item){
+		if (itemNo>0){
+		    series[itemNo].data.push([parseFloat(items[0]), parseFloat(item)])
+		}
+	    });
+	}
+    });
+    series.splice(0,1);
+    var options = {
+	chart: merge_options({
+	    renderTo: 'container_'+suffix,
+	},
+			     chart_type),
+	title: {
+	    text: title
+	},
+	// tooltip: {
+	// 	pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.percentage:.1f}%</b> ({point.y:,.0f})<br/>',
+        // shared: true
+        // },
+	
+	
+	plotOptions: plot_options,
+	
+	xAxis: {
+	    type: 'datetime',
+	    tickmarkPlacement: 'on',
+	    labels: {
+                align: 'left',
+                x: 5,
+                format: '{value:%M:%S}'
+	    },
+	    plotLines: plot_events,
+	    title: {
+                enabled: false
+	    }
+	},
+	yAxis: yAxis_desc,
+	series: series
+    };
+    //	console.log(options.series)
+
+    var newchart = new Highcharts.Chart(options);
+}
+
+function gen_heatmap_options(suffix, title, yAxis_desc, colorAxis_desc, series_desc){
+    
+    var data = document.getElementById("csv_"+suffix).innerHTML;
+    var csv_header = [];
+	
+    var series=[];
+    var yaxis=0;
+
+    var options = {
+	chart: {
+	    renderTo: 'container_'+suffix,
+	    type: 'heatmap',
+	    margin: [60, 10, 80, 70]
+	},
+	title: {
+	    text: title
+	},
+	tooltip: {
+	    backgroundColor: null,
+	    borderWidth: 0,
+	    distance: 10,
+	    shadow: false,
+	    useHTML: true,
+	    style: {
+                padding: 0,
+                color: 'black'
+	    }
+        },
+	xAxis: {
+	    type: 'datetime',
+	    labels: {
+                align: 'left',
+                x: 5,
+                format: '{value:%M:%S}'
+	    },
+	    showLastLabel: false,
+	    tickLength: 16
+	},
+	yAxis: yAxis_desc,
+	colorAxis: merge_options({
+	    stops: [
+                [0, '#3060cf'],
+                [0.5, '#fffbbc'],
+                [0.9, '#c4463a'],
+                [1, '#c4463a']
+	    ],
+	    startOnTick: false,
+	    endOnTick: false,
+	    labels: {
+                format: '{value}%'
+	    }
+	},
+				 colorAxis_desc),
+	series: [merge_options({
+	    name : 'CPU usage',
+	    borderWidth: 1,
+	    nullColor: '#EFEFEF',
+	    colsize: 5000.0, // 1s
+	    tooltip: {
+                headerFormat: 'CPU Usage<br/>',
+                pointFormat: '{point.x%Y-%m-%d %H:%M:%S}<br/>{point.hostname}.{point.coreid}<br/><b>{point.value:%.2f} %</b>'
+	    },
+	    turboThreshold: Number.MAX_VALUE,
+	    data: []
+	}, series_desc)]
+    };
+    
+    var data =  document.getElementById('csv_'+suffix).innerHTML;
+    // Split the lines
+    var lines = data.split('\n');
+    var csv_header = [];
+    var max_value = 0;
+    var min_value = -1;
+    $.each(lines, function(lineNo, line) {
+	var items = line.split(',');
+	    
+	// header line containes categories
+	if (lineNo == 0) {
+	    $.each(items, function(itemNo, item){
+		csv_header.push(item);
+	    });
+	} else { // the rest of the lines contain data with their name in the first position
+	    var series_data = {};
+	    $.each(items, function(itemNo, item) {
+		var value;
+		if (itemNo <= 2) {
+		    value = parseFloat(item);
+		    if (itemNo == 2){
+			if (max_value< value) max_value = value;		
+			if ((min_value<0) || ( min_value>value)) min_value = value;
+		    }
+		} else {
+		    value = item;
+		}
+		series_data[csv_header[itemNo]] = value;
+	    });
+	    options.series[0].data.push(series_data);
+	}
+    }  );
+    if (!("max" in colorAxis_desc)){
+	options.colorAxis.max = max_value;
+    }
+    if (!("min" in colorAxis_desc)){
+	options.colorAxis,min = min_value;
+    }
+
+
+    var newchart = new Highcharts.Chart(options);
+}
+
+    $(function() {
+
+	/**
+	 * This plugin extends Highcharts in two ways:
+	 * - Use HTML5 canvas instead of SVG for rendering of the heatmap squares. Canvas
+	 *   outperforms SVG when it comes to thousands of single shapes.
+	 * - Add a K-D-tree to find the nearest point on mouse move. Since we no longer have SVG shapes
+	 *   to capture mouseovers, we need another way of detecting hover points for the tooltip.
+	 */
+	(function (H) {
+            var wrap = H.wrap,
+            seriesTypes = H.seriesTypes;
+	    
+            /**
+             * Get the canvas context for a series
+             */
+            H.Series.prototype.getContext = function () {
+		var canvas;
+		if (!this.ctx) {
+                    canvas = document.createElement('canvas');
+                    canvas.setAttribute('width', this.chart.plotWidth);
+                    canvas.setAttribute('height', this.chart.plotHeight);
+                    canvas.style.position = 'absolute';
+                    canvas.style.left = this.group.translateX + 'px';
+                    canvas.style.top = this.group.translateY + 'px';
+                    canvas.style.zIndex = 0;
+                    canvas.style.cursor = 'crosshair';
+                    this.chart.container.appendChild(canvas);
+                    if (canvas.getContext) {
+			this.ctx = canvas.getContext('2d');
+                    }
+		}
+		return this.ctx;
+            }
+
+            /**
+             * Wrap the drawPoints method to draw the points in canvas instead of the slower SVG,
+             * that requires one shape each point.
+             */
+            H.wrap(H.seriesTypes.heatmap.prototype, 'drawPoints', function (proceed) {
+		
+		var ctx;
+		if (this.chart.renderer.forExport) {
+                    // Run SVG shapes
+                    proceed.call(this);
+		    
+		} else {
+		    
+                    if (ctx = this.getContext()) {
+			
+			// draw the columns
+			H.each(this.points, function (point) {
+                            var plotY = point.plotY,
+                            shapeArgs;
+			    
+                            if (plotY !== undefined && !isNaN(plotY) && point.y !== null) {
+				shapeArgs = point.shapeArgs;
+				pointAttr = (point.pointAttr && point.pointAttr['']) || point.series.pointAttribs(point);
+				
+				ctx.fillStyle = pointAttr.fill;
+				ctx.fillRect(shapeArgs.x, shapeArgs.y, shapeArgs.width, shapeArgs.height);
+                            }
+			});
+			
+                    } else {
+			this.chart.showLoading("Your browser doesn't support HTML5 canvas, <br>please use a modern browser");
+			
+			// Uncomment this to provide low-level (slow) support in oldIE. It will cause script errors on
+			// charts with more than a few thousand points.
+			//proceed.call(this);
+                    }
+		}
+            });
+	}(Highcharts));
+
+
+//	var chart_cpu_heatmap = new Highcharts.Chart(options);
+	var events = parse_events();
+
+	// generate heatmaps
+	// generate cpu heatmap
+	gen_heatmap_options("cpu_heatmap", "CPU usage heatmap", 
+			    {
+				title: {
+				    text: null
+				},
+				labels: {
+				    formatter: function(){
+					return 'Core-'+this.value;
+				    }
+				},
+				minPadding: 0,
+				maxPadding: 0,
+				startOnTick: false,
+				endOnTick: false,
+				tickWidth: 1,
+				min: 0,
+			    },
+			    {min:0, max:100, labels:{format:'{value}%'}},
+			    {name : 'CPU Usage',
+			     tooltip:{
+				 headerFormat: 'CPU Usage<br/>',
+				 pointFormat: '{point.x:%Y-%m-%d %H:%M:%S}<br/>{point.hostname}.{point.coreid}<br/><b>{point.value:%.2f} %</b>'
+			     }});
+
+	// generate network throughputs heatmap
+	gen_heatmap_options("network_heatmap", "Network throughputs heatmap", 
+			    {
+				title: {
+				    text: null
+				},
+				labels: {
+				    formatter: function(){
+					return  'Eth-'+this.value;
+				    }
+				},
+				minPadding: 0,
+				maxPadding: 0,
+				startOnTick: false,
+				endOnTick: false,
+				tickWidth: 1,
+				min: 0,
+			    },
+			    {labels:{format:'{value}'}},
+			    {name : 'Network throughputs',
+			     tooltip:{
+				 headerFormat: 'Network throughputs<br/>',
+				 pointFormatter: function () {
+				     return Highcharts.dateFormat("%Y-%m-%d %H:%M:%S",this.x)+'<br/>'+this.hostname+"."+this.adapterid+'<br/><b>'+this.value.fileSize()+'</b>';}
+			     }}
+			    );
+
+	// generate disk io throughputs heatmap
+	gen_heatmap_options("diskio_heatmap", "Disk throughputs heatmap", 
+			    {
+				title: {
+				    text: null
+				},
+				labels: {
+				    formatter: function (){
+					return 'Disk-'+this.value;
+				    }
+				},
+				minPadding: 0,
+				maxPadding: 0,
+				startOnTick: false,
+				endOnTick: false,
+				tickWidth: 1,
+				min: 0,
+			    },
+			    {labels:{format: '{value}'}},
+			    {name : 'DiskIO throughputs',
+			     tooltip:{
+				 headerFormat: 'DiskIO throughputs<br/>',
+				 pointFormatter: function () {
+				     return Highcharts.dateFormat("%Y-%m-%d %H:%M:%S",this.x)+'<br/>'+this.hostname+"."+this.diskid+'<br/><b>'+this.value.fileSize()+'</b>';}
+			     }});
+
+	// generate memory usage heatmap
+	gen_heatmap_options("memory_heatmap", "Memory usage heatmap", 
+			    {
+				title: {
+				    text: null
+				},
+				labels: {
+				    formatter: function () {
+					return 'Node-'+this.value;
+				    }
+				},
+				minPadding: 0,
+				maxPadding: 0,
+				startOnTick: false,
+				endOnTick: false,
+				tickWidth: 1,
+				min: 0,
+			    },
+			    {labels:{formatter: function (){ return this.value.fileSize();}}},
+			    {name : 'Memory Usage',
+			     tooltip:{
+				 headerFormat: 'Memory Usage<br/>',
+				 pointFormatter: function () {
+				     return Highcharts.dateFormat("%Y-%m-%d %H:%M:%S",this.x)+'<br/>'+this.hostname+'<br/><b>'+this.value.fileSize()+'</b>';}
+			     }});
+
+	// generate proc numbers heatmap
+	gen_heatmap_options("procload_heatmap", "Process numbers heatmap", 
+			    {
+				title: {
+				    text: null
+				},
+				labels: {
+				    formatter: function () {
+					return  'Node-'+ this.value;
+				    }
+				},
+				minPadding: 0,
+				maxPadding: 0,
+				startOnTick: false,
+				endOnTick: false,
+				tickWidth: 1,
+				min: 0,
+			    },
+			    {labels:{format:'{value}'}},
+			    {name : 'Process(/Thread) numbers',
+			     tooltip:{
+				 headerFormat: 'Process numbers<br/>',
+				 pointFormatter: function () {
+				     return Highcharts.dateFormat("%Y-%m-%d %H:%M:%S",this.x)+'<br/>'+this.hostname+'<br/><b>'+this.value+'</b>';}
+			     }}
+			   );
+	
+
+	// load cpu overall
+	gen_overall_options("cpu_overall", "Summarized CPU usage",
+			    [{	// yaxis
+				title: {
+				    text: 'Percent'
+				},
+				tooltip: {
+				    pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.percentage:.1f}%</b>)<br/>',
+				},
+			    }], 
+			    {	// plot options
+				area: {
+				    stacking: 'percent',
+				    lineColor: '#ffffff',
+				    lineWidth: 1,
+				    marker: {
+					lineWidth: 1,
+					lineColor: '#ffffff'
+				    }
+				}
+			    },
+			    events,
+			    {	// chart type
+			    	type: 'area',
+			    }
+			   );
+
+	// load network overall
+	gen_overall_options("network_overall", "Summarized Network throughputs & Packet-per-seconds", 
+			    [	// yaxis
+				{
+				    title:{
+					text: "Throughput Per Second"
+				    },
+				    tooltip: {
+					pointFormatter: function () {
+					    return '<span style="color:'+this.series.color+'">'+this.series.name+'</span>: <b>' + this.y.fileSize()+'</b>)<br/>';
+					}
+				    },
+				    labels: {
+					formatter: function() {
+					    return this.value.fileSize();
+					    }
+					}
+				},
+				{
+				    title:{
+					text: "Packets Per Second"
+				    },
+				    tooltip: {
+					pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y:.0f} packets</b>)<br/>',
+				    },
+				    opposite: true,
+				    reversed: true
+				},
+			    ],
+			    {},	// plot options
+			    events,
+			    {	// chart type
+			    	type: 'area',
+			    }
+			   );
+
+	// load diskio overall
+	gen_overall_options("diskio_overall", "Summarized Disk throughputs & IOPS",
+			    [	// yaxis
+				{
+				    title:{
+					text: "Throughput Per Second"
+				    },
+				    tooltip: {
+					pointFormatter: function () {
+					    return '<span style="color:'+this.series.color +'">'+this.series.name+'</span>: <b>' + this.y.fileSize()+'</b>)<br/>';
+					},
+				    },
+				    labels: {
+					formatter: function() {
+					    return this.value.fileSize();
+					}
+				    }
+				},
+				{
+				    title:{
+					text: "Operations Per Second"
+				    },
+				    tooltip: {
+					pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y:.0f} IO</b>)<br/>',
+				    },
+				    opposite: true,
+				    reversed: true
+				}
+			    ],
+			    {},	// plot operations
+			    events,
+			    {	// chart type
+			    	type: 'area',
+			    }
+			   );
+
+	// load memory overall
+	gen_overall_options("memory_overall", "Summarized Memory usage",
+			    [{	// yaxis
+				title: {
+				    text: 'Percent'
+				},
+				tooltip: {
+				    pointFormatter: function () {
+					return '<span style="color:'+this.series.color+'">'+this.series.name+'</span>: <b>' + (this.y*1024).fileSize()+'</b>)<br/>';
+				    }
+				},
+			    }], 
+			    {	// plot options
+				area: {
+				    stacking: 'percent',
+				    lineColor: '#ffffff',
+				    lineWidth: 1,
+				    marker: {
+					lineWidth: 1,
+					lineColor: '#ffffff'
+				    }
+				}
+			    },
+			    events,
+			    {	// chart type
+			    	type: 'area',
+			    }
+			   );
+
+	// load procload overall
+	gen_overall_options("procload_overall", "Summarized system load",
+			    [{	// yaxis for loads
+				title: {
+				    text: 'load'
+				},
+				tooltip: {
+				    pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y:0.2f}</b>)<br/>',
+				},
+			    },
+			     {	// yaxis for running & total process
+				 title: {
+				     text: 'process number'
+				 },
+				 tooltip: {
+				     pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y:.0f}</b>)<br/>',
+				 },
+				 opposite: true,
+			    }], 
+			    {	// plot options
+			    },
+			    events,
+			     {	// chart type
+			    }
+			   );
+    });
+</script>
+</head>
+<body>
+    <h1>Workload: HadoopPagerank</h1>
+    
+    <div id="container_cpu_heatmap" style="height: 800px; max-width: 1000px; margin: 0 auto"></div>
+    <div id="container_cpu_overall" style="height: 400px; max-width: 1000px; margin: 0 auto"></div>
+    
+    <div id="container_network_heatmap" style="height: 800px; max-width: 1000px; margin: 0 auto"></div>
+    <div id="container_network_overall" style="height: 400px; max-width: 1000px; margin: 0 auto"></div>
+
+    <div id="container_diskio_heatmap" style="height: 800px; max-width: 1000px; margin: 0 auto"></div>
+    <div id="container_diskio_overall" style="height: 400px; max-width: 1000px; margin: 0 auto"></div>
+    
+    <div id="container_memory_heatmap" style="height: 400px; max-width: 1000px; margin: 0 auto"></div>
+    <div id="container_memory_overall" style="height: 400px; max-width: 1000px; margin: 0 auto"></div>
+
+    <div id="container_procload_heatmap" style="height: 400px; max-width: 1000px; margin: 0 auto"></div>
+    <div id="container_procload_overall" style="height: 400px; max-width: 1000px; margin: 0 auto"></div>
+
+    <pre id="csv_cpu_heatmap" style="display: none">x,y,value,hostname,coreid
+1546766865000,0,2.42914979757,hadoop2,cpu0
+1546766865000,1,67.1370967742,hadoop3,cpu0
+1546766870000,0,0.403225806452,hadoop2,cpu0
+1546766870000,1,87.1743486974,hadoop3,cpu0
+1546766875000,0,92.0,hadoop2,cpu0
+1546766875000,1,100.0,hadoop3,cpu0
+1546766880000,0,100.0,hadoop2,cpu0
+1546766880000,1,100.0,hadoop3,cpu0
+1546766885000,0,100.0,hadoop2,cpu0
+1546766885000,1,100.0,hadoop3,cpu0
+1546766890000,0,100.0,hadoop2,cpu0
+1546766890000,1,100.0,hadoop3,cpu0
+1546766895000,0,100.0,hadoop2,cpu0
+1546766900000,1,100.0,hadoop3,cpu0
+1546766905000,0,100.0,hadoop2,cpu0
+1546766905000,1,100.0,hadoop3,cpu0
+1546766910000,1,100.0,hadoop3,cpu0
+1546766915000,0,100.0,hadoop2,cpu0
+1546766915000,1,100.0,hadoop3,cpu0
+1546766920000,0,100.0,hadoop2,cpu0
+1546766920000,1,100.0,hadoop3,cpu0
+1546766925000,0,100.0,hadoop2,cpu0
+1546766925000,1,100.0,hadoop3,cpu0
+1546766930000,0,100.0,hadoop2,cpu0
+1546766930000,1,100.0,hadoop3,cpu0
+1546766935000,0,100.0,hadoop2,cpu0
+1546766935000,1,100.0,hadoop3,cpu0
+1546766940000,0,100.0,hadoop2,cpu0
+1546766940000,1,100.0,hadoop3,cpu0
+1546766945000,0,100.0,hadoop2,cpu0
+1546766945000,1,100.0,hadoop3,cpu0
+1546766950000,0,100.0,hadoop2,cpu0
+1546766950000,1,100.0,hadoop3,cpu0
+1546766955000,0,100.0,hadoop2,cpu0
+1546766955000,1,100.0,hadoop3,cpu0
+1546766960000,0,100.0,hadoop2,cpu0
+1546766960000,1,100.0,hadoop3,cpu0
+1546766965000,0,100.0,hadoop2,cpu0
+1546766965000,1,100.0,hadoop3,cpu0
+1546766970000,0,100.0,hadoop2,cpu0
+1546766970000,1,100.0,hadoop3,cpu0
+1546766975000,0,100.0,hadoop2,cpu0
+1546766975000,1,100.0,hadoop3,cpu0
+1546766980000,0,100.0,hadoop2,cpu0
+1546766980000,1,100.0,hadoop3,cpu0
+1546766985000,0,100.0,hadoop2,cpu0
+1546766985000,1,100.0,hadoop3,cpu0
+1546766990000,0,100.0,hadoop2,cpu0
+1546766990000,1,100.0,hadoop3,cpu0
+1546766995000,0,55.487804878,hadoop2,cpu0
+1546766995000,1,100.0,hadoop3,cpu0
+1546767000000,0,100.0,hadoop2,cpu0
+1546767000000,1,100.0,hadoop3,cpu0
+1546767005000,0,81.1475409836,hadoop2,cpu0
+1546767005000,1,100.0,hadoop3,cpu0
+1546767010000,0,100.0,hadoop2,cpu0
+1546767010000,1,100.0,hadoop3,cpu0
+1546767015000,0,100.0,hadoop2,cpu0
+1546767015000,1,100.0,hadoop3,cpu0
+1546767020000,0,100.0,hadoop2,cpu0
+1546767020000,1,100.0,hadoop3,cpu0
+1546767025000,0,100.0,hadoop2,cpu0
+1546767025000,1,100.0,hadoop3,cpu0
+1546767030000,0,100.0,hadoop2,cpu0
+1546767030000,1,100.0,hadoop3,cpu0
+1546767035000,0,100.0,hadoop2,cpu0
+1546767035000,1,100.0,hadoop3,cpu0
+1546767040000,0,100.0,hadoop2,cpu0
+1546767040000,1,100.0,hadoop3,cpu0
+1546767045000,0,100.0,hadoop2,cpu0
+1546767045000,1,100.0,hadoop3,cpu0
+1546767050000,0,100.0,hadoop2,cpu0
+1546767050000,1,100.0,hadoop3,cpu0
+1546767055000,0,100.0,hadoop2,cpu0
+1546767055000,1,100.0,hadoop3,cpu0
+1546767060000,0,100.0,hadoop2,cpu0
+1546767060000,1,100.0,hadoop3,cpu0
+1546767065000,0,100.0,hadoop2,cpu0
+1546767065000,1,100.0,hadoop3,cpu0
+1546767070000,0,100.0,hadoop2,cpu0
+1546767070000,1,100.0,hadoop3,cpu0
+1546767075000,0,100.0,hadoop2,cpu0
+1546767075000,1,100.0,hadoop3,cpu0
+1546767080000,0,100.0,hadoop2,cpu0
+1546767080000,1,99.797979798,hadoop3,cpu0
+1546767085000,0,100.0,hadoop2,cpu0
+1546767085000,1,100.0,hadoop3,cpu0
+1546767090000,0,100.0,hadoop2,cpu0
+1546767090000,1,100.0,hadoop3,cpu0
+1546767095000,0,100.0,hadoop2,cpu0
+1546767095000,1,100.0,hadoop3,cpu0
+1546767100000,0,100.0,hadoop2,cpu0
+1546767100000,1,100.0,hadoop3,cpu0
+1546767105000,0,100.0,hadoop2,cpu0
+1546767110000,0,100.0,hadoop2,cpu0
+1546767105000,1,100.0,hadoop3,cpu0
+1546767115000,0,100.0,hadoop2,cpu0
+1546767115000,1,100.0,hadoop3,cpu0
+1546767120000,0,100.0,hadoop2,cpu0
+1546767120000,1,100.0,hadoop3,cpu0
+1546767125000,0,100.0,hadoop2,cpu0
+1546767125000,1,100.0,hadoop3,cpu0
+1546767130000,0,100.0,hadoop2,cpu0
+1546767130000,1,100.0,hadoop3,cpu0
+1546767135000,0,100.0,hadoop2,cpu0
+1546767135000,1,100.0,hadoop3,cpu0
+1546767140000,0,100.0,hadoop2,cpu0
+1546767140000,1,100.0,hadoop3,cpu0
+1546767145000,0,100.0,hadoop2,cpu0
+1546767145000,1,100.0,hadoop3,cpu0
+1546767150000,0,100.0,hadoop2,cpu0
+1546767150000,1,100.0,hadoop3,cpu0
+1546767155000,0,100.0,hadoop2,cpu0
+1546767155000,1,100.0,hadoop3,cpu0
+1546767160000,0,100.0,hadoop2,cpu0
+1546767160000,1,100.0,hadoop3,cpu0
+1546767165000,0,100.0,hadoop2,cpu0
+1546767165000,1,100.0,hadoop3,cpu0
+1546767170000,0,100.0,hadoop2,cpu0
+1546767170000,1,100.0,hadoop3,cpu0
+1546767175000,0,100.0,hadoop2,cpu0
+1546767175000,1,100.0,hadoop3,cpu0
+1546767180000,0,99.7983870968,hadoop2,cpu0
+1546767180000,1,100.0,hadoop3,cpu0
+1546767185000,0,94.422310757,hadoop2,cpu0
+1546767185000,1,100.0,hadoop3,cpu0
+1546767190000,0,92.1686746988,hadoop2,cpu0
+1546767190000,1,100.0,hadoop3,cpu0
+1546767195000,0,100.0,hadoop2,cpu0
+1546767195000,1,100.0,hadoop3,cpu0
+1546767200000,0,100.0,hadoop2,cpu0
+1546767200000,1,100.0,hadoop3,cpu0
+1546767205000,0,99.8257839721,hadoop2,cpu0
+1546767205000,1,100.0,hadoop3,cpu0
+1546767210000,0,100.0,hadoop2,cpu0
+1546767210000,1,100.0,hadoop3,cpu0
+1546767215000,0,100.0,hadoop2,cpu0
+1546767215000,1,100.0,hadoop3,cpu0
+1546767220000,0,100.0,hadoop2,cpu0
+1546767220000,1,100.0,hadoop3,cpu0
+1546767225000,0,100.0,hadoop2,cpu0
+1546767225000,1,100.0,hadoop3,cpu0
+1546767230000,0,100.0,hadoop2,cpu0
+1546767230000,1,91.1468812877,hadoop3,cpu0
+1546767235000,0,100.0,hadoop2,cpu0
+1546767235000,1,100.0,hadoop3,cpu0
+1546767240000,0,100.0,hadoop2,cpu0
+1546767240000,1,100.0,hadoop3,cpu0
+1546767245000,0,99.6007984032,hadoop2,cpu0
+1546767245000,1,100.0,hadoop3,cpu0
+1546767250000,0,100.0,hadoop2,cpu0
+1546767250000,1,100.0,hadoop3,cpu0
+1546767255000,0,100.0,hadoop2,cpu0
+1546767255000,1,100.0,hadoop3,cpu0
+1546767260000,0,100.0,hadoop2,cpu0
+1546767260000,1,100.0,hadoop3,cpu0
+1546767265000,0,100.0,hadoop2,cpu0
+1546767265000,1,100.0,hadoop3,cpu0
+1546767270000,0,100.0,hadoop2,cpu0
+1546767270000,1,100.0,hadoop3,cpu0
+1546767275000,0,100.0,hadoop2,cpu0
+1546767275000,1,100.0,hadoop3,cpu0
+1546767280000,0,100.0,hadoop2,cpu0
+1546767280000,1,100.0,hadoop3,cpu0
+1546767285000,0,32.6612903226,hadoop2,cpu0
+1546767285000,1,100.0,hadoop3,cpu0
+1546767290000,0,2.22222222222,hadoop2,cpu0
+1546767290000,1,93.8775510204,hadoop3,cpu0
+1546767295000,0,14.6881287726,hadoop2,cpu0
+1546767295000,1,74.3902439024,hadoop3,cpu0
+1546767300000,0,7.47474747475,hadoop2,cpu0
+1546767300000,1,99.3865030675,hadoop3,cpu0
+1546767305000,0,2.41935483871,hadoop2,cpu0
+1546767305000,1,99.8,hadoop3,cpu0
+1546767310000,0,51.724137931,hadoop2,cpu0
+1546767310000,1,86.9477911647,hadoop3,cpu0
+1546767315000,0,100.0,hadoop2,cpu0
+1546767315000,1,100.0,hadoop3,cpu0
+1546767320000,0,100.0,hadoop2,cpu0
+1546767320000,1,100.0,hadoop3,cpu0
+1546767325000,0,100.0,hadoop2,cpu0
+1546767325000,1,100.0,hadoop3,cpu0
+1546767330000,0,100.0,hadoop2,cpu0
+1546767330000,1,100.0,hadoop3,cpu0
+1546767335000,0,100.0,hadoop2,cpu0
+1546767335000,1,100.0,hadoop3,cpu0
+1546767340000,1,100.0,hadoop3,cpu0
+1546767345000,1,100.0,hadoop3,cpu0
+1546767340000,0,100.0,hadoop2,cpu0
+1546767345000,1,100.0,hadoop3,cpu0
+1546767350000,0,100.0,hadoop2,cpu0
+1546767350000,1,100.0,hadoop3,cpu0
+1546767355000,0,100.0,hadoop2,cpu0
+1546767355000,1,100.0,hadoop3,cpu0
+1546767360000,0,100.0,hadoop2,cpu0
+1546767360000,1,100.0,hadoop3,cpu0
+1546767365000,0,100.0,hadoop2,cpu0
+1546767365000,1,100.0,hadoop3,cpu0
+1546767370000,0,100.0,hadoop2,cpu0
+1546767370000,1,100.0,hadoop3,cpu0
+1546767375000,0,100.0,hadoop2,cpu0
+1546767375000,1,100.0,hadoop3,cpu0
+1546767380000,0,100.0,hadoop2,cpu0
+1546767380000,1,100.0,hadoop3,cpu0
+1546767385000,0,100.0,hadoop2,cpu0
+1546767385000,1,100.0,hadoop3,cpu0
+1546767390000,0,100.0,hadoop2,cpu0
+1546767390000,1,100.0,hadoop3,cpu0
+1546767395000,0,100.0,hadoop2,cpu0
+1546767395000,1,100.0,hadoop3,cpu0
+1546767400000,0,100.0,hadoop2,cpu0
+1546767400000,1,99.8003992016,hadoop3,cpu0
+1546767405000,0,100.0,hadoop2,cpu0
+1546767405000,1,100.0,hadoop3,cpu0
+1546767410000,0,100.0,hadoop2,cpu0
+1546767410000,1,100.0,hadoop3,cpu0
+1546767415000,0,100.0,hadoop2,cpu0
+1546767415000,1,80.404040404,hadoop3,cpu0
+1546767420000,0,100.0,hadoop2,cpu0
+1546767420000,1,100.0,hadoop3,cpu0
+1546767425000,0,100.0,hadoop2,cpu0
+1546767425000,1,100.0,hadoop3,cpu0
+1546767430000,0,100.0,hadoop2,cpu0
+1546767430000,1,100.0,hadoop3,cpu0
+1546767435000,0,100.0,hadoop2,cpu0
+1546767435000,1,100.0,hadoop3,cpu0
+1546767440000,0,100.0,hadoop2,cpu0
+1546767440000,1,44.2857142857,hadoop3,cpu0
+1546767445000,0,100.0,hadoop2,cpu0
+1546767445000,1,16.3967611336,hadoop3,cpu0
+1546767450000,0,100.0,hadoop2,cpu0
+1546767450000,1,9.33062880325,hadoop3,cpu0
+1546767455000,0,100.0,hadoop2,cpu0
+1546767455000,1,36.8635437882,hadoop3,cpu0
+1546767460000,0,100.0,hadoop2,cpu0
+1546767460000,1,30.101010101,hadoop3,cpu0
+1546767465000,0,100.0,hadoop2,cpu0
+1546767465000,1,11.8609406953,hadoop3,cpu0
+1546767470000,0,100.0,hadoop2,cpu0
+1546767470000,1,55.2845528455,hadoop3,cpu0
+1546767475000,0,100.0,hadoop2,cpu0
+1546767475000,1,9.1649694501,hadoop3,cpu0
+1546767480000,0,100.0,hadoop2,cpu0
+1546767480000,1,20.1219512195,hadoop3,cpu0
+1546767485000,0,100.0,hadoop2,cpu0
+1546767485000,1,15.4786150713,hadoop3,cpu0
+1546767490000,0,100.0,hadoop2,cpu0
+1546767490000,1,19.6356275304,hadoop3,cpu0
+1546767495000,0,100.0,hadoop2,cpu0
+1546767495000,1,81.6532258065,hadoop3,cpu0
+1546767500000,0,100.0,hadoop2,cpu0
+1546767500000,1,100.0,hadoop3,cpu0
+1546767505000,0,100.0,hadoop2,cpu0
+1546767505000,1,100.0,hadoop3,cpu0
+1546767510000,0,100.0,hadoop2,cpu0
+1546767510000,1,100.0,hadoop3,cpu0
+1546767515000,0,100.0,hadoop2,cpu0
+1546767515000,1,100.0,hadoop3,cpu0
+1546767520000,0,100.0,hadoop2,cpu0
+1546767520000,1,100.0,hadoop3,cpu0
+1546767525000,0,100.0,hadoop2,cpu0
+1546767525000,1,100.0,hadoop3,cpu0
+1546767530000,0,100.0,hadoop2,cpu0
+1546767530000,1,100.0,hadoop3,cpu0
+1546767535000,0,100.0,hadoop2,cpu0
+1546767535000,1,100.0,hadoop3,cpu0
+1546767540000,0,100.0,hadoop2,cpu0
+1546767540000,1,100.0,hadoop3,cpu0
+1546767545000,0,100.0,hadoop2,cpu0
+1546767545000,1,92.1843687375,hadoop3,cpu0
+1546767550000,0,80.9619238477,hadoop2,cpu0
+1546767550000,1,30.3462321792,hadoop3,cpu0</pre>
+    <pre id="csv_cpu_overall" style="display: none">x,idle,user,system,iowait,others
+1546766865000,65.2168767141,26.1096872143,2.01694527883,6.65649079274,0.0
+1546766870000,56.2112127481,35.4715479346,3.30721927726,4.90981963928,0.100200400802
+1546766875000,4.0,81.6,9.1,5.3,0.0
+1546766880000,0.0,94.8051896208,5.19481037924,0.0,0.0
+1546766885000,0.0,95.29498998,4.70501002004,0.0,0.0
+1546766890000,0.0,94.8157469921,4.9848510151,0.0,0.199401992827
+1546766895000,0.0,97.0,3.0,0.0,0.0
+1546766900000,0.0,17.7033492823,19.3779904306,53.4688995215,9.44976076555
+1546766905000,0.0,21.0288000842,14.1587554035,62.6392300612,2.17321445106
+1546766910000,0.0,37.6299376299,30.3534303534,30.3534303534,1.6632016632
+1546766915000,0.0,29.5631610679,24.9903418969,41.715542522,3.73095451326
+1546766920000,0.0,29.0665582415,22.6164954043,46.9135802469,1.40336610729
+1546766925000,0.0,39.9451097804,44.435926534,13.5080645161,2.1108991694
+1546766930000,0.0,52.6937381867,17.1318822023,28.2568136089,1.91756600207
+1546766935000,0.0,44.5217744726,25.6734352239,28.4999718312,1.30481847229
+1546766940000,0.0,29.7855508495,44.4708144686,20.6300813008,5.11355338104
+1546766945000,0.0,26.639593325,19.2838019841,53.368906445,0.707698245845
+1546766950000,0.0,26.3554027847,24.768313272,48.3772819473,0.499001996008
+1546766955000,0.0,23.2227642276,27.4243902439,45.4268292683,3.92601626016
+1546766960000,0.0,32.3605220563,21.9806585121,43.4279918864,2.23082754523
+1546766965000,0.0,49.6581162325,37.1200400802,10.8216432866,2.4002004008
+1546766970000,0.0,31.1231112537,17.9722594948,50.7132022636,0.191426987924
+1546766975000,0.0,19.3456726621,8.42818742948,71.7163337094,0.509806198978
+1546766980000,0.0,35.4068044609,14.0839470955,48.150721145,2.35852729859
+1546766985000,0.0,16.0344182566,10.3049008605,71.5039281706,2.15675271231
+1546766990000,0.0,7.65202211231,9.38546905524,82.8604680161,0.102040816327
+1546766995000,22.256097561,24.3583451931,9.97407207472,41.0761315863,2.33535358492
+1546767000000,0.0,34.8868945168,12.7952626834,52.2174411933,0.100401606426
+1546767005000,9.4262295082,15.4829734773,10.7023857124,64.081034253,0.30737704918
+1546767010000,0.0,20.0897936971,9.44008806214,70.2668662082,0.20325203252
+1546767015000,0.0,9.55119642474,4.36723890565,86.0815646696,0.0
+1546767020000,0.0,10.9732994743,6.041085221,82.885011683,0.10060362173
+1546767025000,0.0,9.6361574933,5.07318078747,85.2906617192,0.0
+1546767030000,0.0,11.8529863432,5.26746926608,82.6769099375,0.202634453195
+1546767035000,0.0,8.71068194155,4.35044343138,86.8374547488,0.101419878296
+1546767040000,0.0,14.8,7.00851926978,78.0914807302,0.1
+1546767045000,0.0,3.86841190204,2.74742105873,93.2823340453,0.10183299389
+1546767050000,0.0,4.96392496392,3.34879406308,91.687280973,0.0
+1546767055000,0.0,4.36775042845,3.66028331802,91.6662527011,0.305713552404
+1546767060000,0.0,8.39790601978,2.45154974447,89.0480852194,0.102459016393
+1546767065000,0.0,4.814329329,2.45403862746,92.7316320435,0.0
+1546767070000,0.0,21.2668587467,2.75349179934,75.979649454,0.0
+1546767075000,0.0,27.4747474747,2.52525252525,70.0,0.0
+1546767080000,0.10101010101,21.7175814945,2.62913106726,75.4512672363,0.10101010101
+1546767085000,0.0,21.994900138,3.04883056304,74.956269299,0.0
+1546767090000,0.0,26.4110874927,3.32519309405,70.1629129616,0.100806451613
+1546767095000,0.0,26.5182186235,2.73279352227,70.7489878543,0.0
+1546767100000,0.0,32.5608911698,3.62984685565,63.8092619746,0.0
+1546767105000,0.0,0.0,1.41987829615,98.5801217039,0.0
+1546767110000,0.0,0.401606425703,0.602409638554,98.9959839357,0.0
+1546767105000,0.0,20.3938115331,10.4078762307,67.5105485232,1.68776371308
+1546767115000,0.0,1.08342995623,2.99416084318,94.3712199555,1.55118924509
+1546767120000,0.0,6.1195745904,11.9344639264,81.2316757689,0.714285714286
+1546767125000,0.0,2.60060362173,8.53454057679,86.3648558015,2.5
+1546767130000,0.0,17.3060663707,16.4955368031,65.7935385266,0.404858299595
+1546767135000,0.0,19.2697768763,14.9068818295,63.7949437283,2.02839756592
+1546767140000,0.0,14.7038458092,7.09531839325,77.5923165278,0.608519269777
+1546767145000,0.0,5.19102394407,2.64519909682,92.1637769591,0.0
+1546767150000,0.0,2.95487208968,2.2377119862,94.7053751078,0.102040816327
+1546767155000,0.0,16.3884575569,11.6142598344,71.2719979296,0.725284679089
+1546767160000,0.0,23.8267725947,8.99883456352,66.8638232293,0.310569612418
+1546767165000,0.0,13.4015974387,6.44926078648,79.7395152369,0.409626537933
+1546767170000,0.0,60.8228652427,11.4656141551,27.4109193998,0.300601202405
+1546767175000,0.0,76.8191919192,7.62525252525,15.5555555556,0.0
+1546767180000,0.100806451613,81.199496169,8.11602601249,10.3830645161,0.200606850815
+1546767185000,2.78884462151,64.9785165174,7.40659094006,24.7264463274,0.0996015936255
+1546767190000,3.9156626506,83.8563836183,5.80285212707,6.3246999976,0.100401606426
+1546767195000,0.0,81.7846774194,7.53064516129,10.5846774194,0.1
+1546767200000,0.0,48.4557080782,7.60418724077,43.8376456646,0.102459016393
+1546767205000,0.0871080139373,26.5865082538,9.63221854115,63.3303821329,0.363783058205
+1546767210000,0.0,30.1349544323,12.3643769672,56.6901191137,0.810549486721
+1546767215000,0.0,90.2099800399,9.59021956088,0.0,0.199800399202
+1546767220000,0.0,87.2925491702,9.50183800735,2.90581162325,0.299801199205
+1546767225000,0.0,73.8445411901,14.664728184,10.8870967742,0.60363385169
+1546767230000,4.42655935614,78.7915871985,11.4506679355,5.03018108652,0.301004423334
+1546767235000,0.0,90.3128967098,9.38829850937,0.0,0.298804780876
+1546767240000,0.0,88.7125748503,10.6882235529,0.0,0.599201596806
+1546767245000,0.199600798403,89.2149700599,9.2880239521,1.19760479042,0.0998003992016
+1546767250000,0.0,92.6003704015,7.20002880012,0.0,0.199600798403
+1546767255000,0.0,93.9165493714,5.98365022942,0.0,0.0998003992016
+1546767260000,0.0,94.7161453984,5.28385460155,0.0,0.0
+1546767265000,0.0,93.8,6.0,0.0,0.2
+1546767270000,0.0,94.5047904192,5.39540918164,0.0,0.0998003992016
+1546767275000,0.0,91.8985675943,7.80163120652,0.0,0.299801199205
+1546767280000,0.0,92.2235210853,7.37767492903,0.0,0.398803985654
+1546767285000,33.6693548387,63.5241935484,2.8064516129,0.0,0.0
+1546767290000,51.9501133787,15.9163059163,4.48670377242,27.5448361163,0.102040816327
+1546767295000,55.4608136625,2.94510968249,2.13005676334,39.161186632,0.302833259721
+1546767300000,46.5693747289,15.0281960711,2.86174629733,35.5406829026,0.0
+1546767305000,48.8903225806,42.4008064516,3.30161290323,5.30725806452,0.1
+1546767310000,30.6640354522,37.7835887159,5.13270119016,26.4196746418,0.0
+1546767315000,0.0,87.9396585315,10.665322741,1.09561752988,0.299401197605
+1546767320000,0.0,94.4,5.5,0.0,0.1
+1546767325000,0.0,94.2171434024,5.68325500394,0.0,0.0996015936255
+1546767330000,0.0,93.4,6.4,0.0,0.2
+1546767335000,0.0,63.8158377123,12.8168153489,19.7959183673,3.57142857143
+1546767340000,0.0,54.3259557344,24.7484909457,18.9134808853,2.01207243461
+1546767345000,0.0,57.4297188755,22.0883534137,19.8795180723,0.602409638554
+1546767340000,0.0,72.2375690608,22.7900552486,2.34806629834,2.62430939227
+1546767345000,0.0,67.3387096774,13.1048387097,19.3548387097,0.201612903226
+1546767350000,0.0,49.3557976884,10.4250385171,37.0689655172,3.15019827719
+1546767355000,0.0,43.042662109,7.88197731846,47.4355191055,1.63984146696
+1546767360000,0.0,44.1890512871,9.75582658503,42.7764336033,3.27868852459
+1546767365000,0.0,48.8042510021,13.6992543838,32.0247933884,5.47170122565
+1546767370000,0.0,33.3284159454,19.058975872,43.1517178075,4.46089037503
+1546767375000,0.0,11.6293279022,7.54146057608,79.1992601521,1.62995136955
+1546767380000,0.0,18.0431020922,12.9153109295,67.816662941,1.22492403732
+1546767385000,0.0,5.67295349067,2.63487047826,91.3885323064,0.303643724696
+1546767390000,0.0,7.96878260507,8.67743416385,81.5170485372,1.83673469388
+1546767395000,0.0,17.72796188,16.6862431482,63.4269672281,2.15882774362
+1546767400000,0.0998003992016,53.4358113042,18.7259627087,25.3012268147,2.43719877319
+1546767405000,0.0,52.4721311475,12.2016393443,32.5598360656,2.76639344262
+1546767410000,0.0,45.8276655007,16.5193030185,37.1494040679,0.503627412877
+1546767415000,9.79797979798,46.15922539,13.019544558,30.8260115952,0.197238658777
+1546767420000,0.0,51.9949958096,9.56848979526,38.1338742394,0.302640155794
+1546767425000,0.0,30.7513454628,6.64032648814,62.5071134741,0.101214574899
+1546767430000,0.0,65.3198632915,10.1344594513,24.245472837,0.300204420134
+1546767435000,0.0,51.2429376206,4.54111508438,44.1132778905,0.102669404517
+1546767440000,27.8571428571,29.5567924139,4.15378272521,38.4322820037,0.0
+1546767445000,41.8016194332,25.4000976959,3.76977720375,28.9262561784,0.102249488753
+1546767450000,45.3346855984,42.6038840962,3.82442549101,8.13660320796,0.100401606426
+1546767455000,31.5682281059,47.0162320568,5.83284695664,15.4808598868,0.10183299389
+1546767460000,34.9494949495,15.8585858586,7.47474747475,39.696969697,2.0202020202
+1546767465000,44.0695296524,12.4806044258,3.93083637695,39.1299244866,0.389105058366
+1546767470000,22.3577235772,35.0153978813,11.8415865977,30.4810298103,0.30426213353
+1546767475000,45.4175152749,47.5568228106,6.51649694501,0.50916496945,0.0
+1546767480000,39.9390243902,51.2925368775,5.21335378024,3.45528455285,0.0998003992016
+1546767485000,42.2606924644,49.3788187373,6.22566191446,1.93482688391,0.2
+1546767490000,40.1821862348,49.4685226705,5.79786118683,4.25101214575,0.30041776215
+1546767495000,9.17338709677,72.8045245498,8.84910610183,8.97177419355,0.201208058039
+1546767500000,0.0,75.1750503018,10.138028169,14.2857142857,0.401207243461
+1546767505000,0.0,92.1999687999,7.80003120012,0.0,0.0
+1546767510000,0.0,94.9101796407,4.99001996008,0.0,0.0998003992016
+1546767515000,0.0,95.0099800399,4.89021956088,0.0,0.0998003992016
+1546767520000,0.0,94.1945891784,5.60541082164,0.0,0.2
+1546767525000,0.0,93.1137724551,6.3872255489,0.0,0.499001996008
+1546767530000,0.0,90.9097804391,8.89061876248,0.0,0.199600798403
+1546767535000,0.0,92.6147704591,6.98602794411,0.0,0.399201596806
+1546767540000,0.0,93.7063872255,6.09361277445,0.0,0.2
+1546767545000,3.90781563126,87.4791583166,5.60721442886,2.90581162325,0.1
+1546767550000,44.3459219865,35.5182870833,4.74533588562,14.9880208482,0.402434196295</pre>
+    <pre id="csv_network_heatmap" style="display: none">x,y,value,hostname,adapterid
+1546766865000,0,73600.0,hadoop2,ens33.recv
+1546766865000,1,58490.0,hadoop2,ens33.send
+1546766865000,2,75123.2,hadoop3,ens33.recv
+1546766865000,3,23556.8,hadoop3,ens33.send
+1546766870000,0,19928.8,hadoop2,ens33.recv
+1546766870000,1,1285.6,hadoop2,ens33.send
+1546766870000,2,2635.2,hadoop3,ens33.recv
+1546766870000,3,30361.0,hadoop3,ens33.send
+1546766875000,0,4336.8,hadoop2,ens33.recv
+1546766875000,1,2163.2,hadoop2,ens33.send
+1546766875000,2,1129.0,hadoop3,ens33.recv
+1546766875000,3,2416.0,hadoop3,ens33.send
+1546766880000,0,334.6,hadoop2,ens33.recv
+1546766880000,1,1327.6,hadoop2,ens33.send
+1546766880000,2,1377.2,hadoop3,ens33.recv
+1546766880000,3,2501.2,hadoop3,ens33.send
+1546766885000,0,549.6,hadoop2,ens33.recv
+1546766885000,1,1350.4,hadoop2,ens33.send
+1546766885000,2,1209.8,hadoop3,ens33.recv
+1546766885000,3,2394.4,hadoop3,ens33.send
+1546766890000,0,1899.6,hadoop2,ens33.recv
+1546766890000,1,3140.8,hadoop2,ens33.send
+1546766890000,2,5002.4,hadoop3,ens33.recv
+1546766890000,3,5109.8,hadoop3,ens33.send
+1546766895000,0,286.6,hadoop2,ens33.recv
+1546766895000,1,1279.8,hadoop2,ens33.send
+1546766900000,2,3244.6,hadoop3,ens33.recv
+1546766900000,3,3897.4,hadoop3,ens33.send
+1546766905000,0,5163.8,hadoop2,ens33.recv
+1546766905000,1,5306.0,hadoop2,ens33.send
+1546766905000,2,1260.8,hadoop3,ens33.recv
+1546766905000,3,2540.4,hadoop3,ens33.send
+1546766910000,2,835.8,hadoop3,ens33.recv
+1546766910000,3,1849.4,hadoop3,ens33.send
+1546766915000,0,885.2,hadoop2,ens33.recv
+1546766915000,1,1381.4,hadoop2,ens33.send
+1546766915000,2,885.2,hadoop3,ens33.recv
+1546766915000,3,2136.8,hadoop3,ens33.send
+1546766920000,0,345.6,hadoop2,ens33.recv
+1546766920000,1,949.0,hadoop2,ens33.send
+1546766920000,2,597.2,hadoop3,ens33.recv
+1546766920000,3,1202.8,hadoop3,ens33.send
+1546766925000,0,193.0,hadoop2,ens33.recv
+1546766925000,1,609.6,hadoop2,ens33.send
+1546766925000,2,741.2,hadoop3,ens33.recv
+1546766925000,3,1753.8,hadoop3,ens33.send
+1546766930000,0,270.8,hadoop2,ens33.recv
+1546766930000,1,770.8,hadoop2,ens33.send
+1546766930000,2,594.6,hadoop3,ens33.recv
+1546766930000,3,1350.6,hadoop3,ens33.send
+1546766935000,0,287.4,hadoop2,ens33.recv
+1546766935000,1,865.6,hadoop2,ens33.send
+1546766935000,2,633.6,hadoop3,ens33.recv
+1546766935000,3,1475.4,hadoop3,ens33.send
+1546766940000,0,346.4,hadoop2,ens33.recv
+1546766940000,1,1126.4,hadoop2,ens33.send
+1546766940000,2,1455.4,hadoop3,ens33.recv
+1546766940000,3,2348.0,hadoop3,ens33.send
+1546766945000,0,193.6,hadoop2,ens33.recv
+1546766945000,1,714.2,hadoop2,ens33.send
+1546766945000,2,434.6,hadoop3,ens33.recv
+1546766945000,3,1179.4,hadoop3,ens33.send
+1546766950000,0,214.4,hadoop2,ens33.recv
+1546766950000,1,714.8,hadoop2,ens33.send
+1546766950000,2,385.8,hadoop3,ens33.recv
+1546766950000,3,1256.2,hadoop3,ens33.send
+1546766955000,0,219.4,hadoop2,ens33.recv
+1546766955000,1,636.8,hadoop2,ens33.send
+1546766955000,2,470.8,hadoop3,ens33.recv
+1546766955000,3,1360.2,hadoop3,ens33.send
+1546766960000,0,416.6,hadoop2,ens33.recv
+1546766960000,1,957.0,hadoop2,ens33.send
+1546766960000,2,591.0,hadoop3,ens33.recv
+1546766960000,3,1170.2,hadoop3,ens33.send
+1546766965000,0,270.4,hadoop2,ens33.recv
+1546766965000,1,1143.6,hadoop2,ens33.send
+1546766965000,2,1153.0,hadoop3,ens33.recv
+1546766965000,3,1241.6,hadoop3,ens33.send
+1546766970000,0,425.4,hadoop2,ens33.recv
+1546766970000,1,1511.4,hadoop2,ens33.send
+1546766970000,2,620.8,hadoop3,ens33.recv
+1546766970000,3,1114.6,hadoop3,ens33.send
+1546766975000,0,447.6,hadoop2,ens33.recv
+1546766975000,1,1315.2,hadoop2,ens33.send
+1546766975000,2,709.4,hadoop3,ens33.recv
+1546766975000,3,1671.4,hadoop3,ens33.send
+1546766980000,0,534.8,hadoop2,ens33.recv
+1546766980000,1,1648.6,hadoop2,ens33.send
+1546766980000,2,781.0,hadoop3,ens33.recv
+1546766980000,3,1949.0,hadoop3,ens33.send
+1546766985000,0,682.2,hadoop2,ens33.recv
+1546766985000,1,1879.4,hadoop2,ens33.send
+1546766985000,2,998.2,hadoop3,ens33.recv
+1546766985000,3,1697.4,hadoop3,ens33.send
+1546766990000,0,651.0,hadoop2,ens33.recv
+1546766990000,1,1726.6,hadoop2,ens33.send
+1546766990000,2,537.6,hadoop3,ens33.recv
+1546766990000,3,1338.2,hadoop3,ens33.send
+1546766995000,0,648.8,hadoop2,ens33.recv
+1546766995000,1,1748.6,hadoop2,ens33.send
+1546766995000,2,2023.0,hadoop3,ens33.recv
+1546766995000,3,2171.4,hadoop3,ens33.send
+1546767000000,0,1155.4,hadoop2,ens33.recv
+1546767000000,1,3432.0,hadoop2,ens33.send
+1546767000000,2,1917.2,hadoop3,ens33.recv
+1546767000000,3,1956.0,hadoop3,ens33.send
+1546767005000,0,1402.2,hadoop2,ens33.recv
+1546767005000,1,3665.4,hadoop2,ens33.send
+1546767005000,2,2456.4,hadoop3,ens33.recv
+1546767005000,3,2809.8,hadoop3,ens33.send
+1546767010000,0,487.4,hadoop2,ens33.recv
+1546767010000,1,1465.8,hadoop2,ens33.send
+1546767010000,2,1037.6,hadoop3,ens33.recv
+1546767010000,3,2317.2,hadoop3,ens33.send
+1546767015000,0,466.0,hadoop2,ens33.recv
+1546767015000,1,1330.2,hadoop2,ens33.send
+1546767015000,2,1227.8,hadoop3,ens33.recv
+1546767015000,3,2425.0,hadoop3,ens33.send
+1546767020000,0,313.2,hadoop2,ens33.recv
+1546767020000,1,1164.4,hadoop2,ens33.send
+1546767020000,2,1047.6,hadoop3,ens33.recv
+1546767020000,3,2153.8,hadoop3,ens33.send
+1546767025000,0,555.6,hadoop2,ens33.recv
+1546767025000,1,1468.4,hadoop2,ens33.send
+1546767025000,2,1208.6,hadoop3,ens33.recv
+1546767025000,3,2256.2,hadoop3,ens33.send
+1546767030000,0,556.4,hadoop2,ens33.recv
+1546767030000,1,1499.4,hadoop2,ens33.send
+1546767030000,2,869.0,hadoop3,ens33.recv
+1546767030000,3,2135.6,hadoop3,ens33.send
+1546767035000,0,278.6,hadoop2,ens33.recv
+1546767035000,1,1031.0,hadoop2,ens33.send
+1546767035000,2,1183.2,hadoop3,ens33.recv
+1546767035000,3,1654.0,hadoop3,ens33.send
+1546767040000,0,352.8,hadoop2,ens33.recv
+1546767040000,1,959.4,hadoop2,ens33.send
+1546767040000,2,1633.8,hadoop3,ens33.recv
+1546767040000,3,7028.2,hadoop3,ens33.send
+1546767045000,0,3701.2,hadoop2,ens33.recv
+1546767045000,1,1194.6,hadoop2,ens33.send
+1546767045000,2,1033.6,hadoop3,ens33.recv
+1546767045000,3,2701.4,hadoop3,ens33.send
+1546767050000,0,387.0,hadoop2,ens33.recv
+1546767050000,1,1290.4,hadoop2,ens33.send
+1546767050000,2,1370.6,hadoop3,ens33.recv
+1546767050000,3,2462.6,hadoop3,ens33.send
+1546767055000,0,6845.0,hadoop2,ens33.recv
+1546767055000,1,1271.6,hadoop2,ens33.send
+1546767055000,2,1296.6,hadoop3,ens33.recv
+1546767055000,3,9858.2,hadoop3,ens33.send
+1546767060000,0,19028.4,hadoop2,ens33.recv
+1546767060000,1,1464.6,hadoop2,ens33.send
+1546767060000,2,1900.4,hadoop3,ens33.recv
+1546767060000,3,35919.0,hadoop3,ens33.send
+1546767065000,0,219.2,hadoop2,ens33.recv
+1546767065000,1,718.6,hadoop2,ens33.send
+1546767065000,2,1125.0,hadoop3,ens33.recv
+1546767065000,3,2294.4,hadoop3,ens33.send
+1546767070000,0,191.8,hadoop2,ens33.recv
+1546767070000,1,608.0,hadoop2,ens33.send
+1546767070000,2,1130.0,hadoop3,ens33.recv
+1546767070000,3,2221.2,hadoop3,ens33.send
+1546767075000,0,201.2,hadoop2,ens33.recv
+1546767075000,1,700.4,hadoop2,ens33.send
+1546767075000,2,1130.0,hadoop3,ens33.recv
+1546767075000,3,2216.2,hadoop3,ens33.send
+1546767080000,0,214.4,hadoop2,ens33.recv
+1546767080000,1,713.6,hadoop2,ens33.send
+1546767080000,2,1338.6,hadoop3,ens33.recv
+1546767080000,3,2418.4,hadoop3,ens33.send
+1546767085000,0,179.8,hadoop2,ens33.recv
+1546767085000,1,596.0,hadoop2,ens33.send
+1546767085000,2,1194.6,hadoop3,ens33.recv
+1546767085000,3,2364.2,hadoop3,ens33.send
+1546767090000,0,247.0,hadoop2,ens33.recv
+1546767090000,1,728.2,hadoop2,ens33.send
+1546767090000,2,1294.0,hadoop3,ens33.recv
+1546767090000,3,2426.4,hadoop3,ens33.send
+1546767095000,0,219.2,hadoop2,ens33.recv
+1546767095000,1,718.2,hadoop2,ens33.send
+1546767095000,2,1138.4,hadoop3,ens33.recv
+1546767095000,3,2321.2,hadoop3,ens33.send
+1546767100000,0,179.8,hadoop2,ens33.recv
+1546767100000,1,595.8,hadoop2,ens33.send
+1546767100000,2,2883.0,hadoop3,ens33.recv
+1546767100000,3,3303.2,hadoop3,ens33.send
+1546767105000,0,240.8,hadoop2,ens33.recv
+1546767105000,1,739.8,hadoop2,ens33.send
+1546767110000,0,227.6,hadoop2,ens33.recv
+1546767110000,1,726.8,hadoop2,ens33.send
+1546767105000,2,2404.6,hadoop3,ens33.recv
+1546767105000,3,2763.2,hadoop3,ens33.send
+1546767115000,0,193.0,hadoop2,ens33.recv
+1546767115000,1,609.2,hadoop2,ens33.send
+1546767115000,2,825.6,hadoop3,ens33.recv
+1546767115000,3,1483.8,hadoop3,ens33.send
+1546767120000,0,214.4,hadoop2,ens33.recv
+1546767120000,1,713.6,hadoop2,ens33.send
+1546767120000,2,681.2,hadoop3,ens33.recv
+1546767120000,3,1333.0,hadoop3,ens33.send
+1546767125000,0,201.2,hadoop2,ens33.recv
+1546767125000,1,700.2,hadoop2,ens33.send
+1546767125000,2,1092.6,hadoop3,ens33.recv
+1546767125000,3,1661.2,hadoop3,ens33.send
+1546767130000,0,224.2,hadoop2,ens33.recv
+1546767130000,1,640.0,hadoop2,ens33.send
+1546767130000,2,813.8,hadoop3,ens33.recv
+1546767130000,3,1443.2,hadoop3,ens33.send
+1546767135000,0,311.8,hadoop2,ens33.recv
+1546767135000,1,792.6,hadoop2,ens33.send
+1546767135000,2,1264.4,hadoop3,ens33.recv
+1546767135000,3,2276.8,hadoop3,ens33.send
+1546767140000,0,225.2,hadoop2,ens33.recv
+1546767140000,1,724.0,hadoop2,ens33.send
+1546767140000,2,666.6,hadoop3,ens33.recv
+1546767140000,3,1354.4,hadoop3,ens33.send
+1546767145000,0,179.8,hadoop2,ens33.recv
+1546767145000,1,595.6,hadoop2,ens33.send
+1546767145000,2,207.8,hadoop3,ens33.recv
+1546767145000,3,614.6,hadoop3,ens33.send
+1546767150000,0,201.2,hadoop2,ens33.recv
+1546767150000,1,700.0,hadoop2,ens33.send
+1546767150000,2,249.0,hadoop3,ens33.recv
+1546767150000,3,902.6,hadoop3,ens33.send
+1546767155000,0,392.8,hadoop2,ens33.recv
+1546767155000,1,1288.2,hadoop2,ens33.send
+1546767155000,2,766.0,hadoop3,ens33.recv
+1546767155000,3,1658.4,hadoop3,ens33.send
+1546767160000,0,278.4,hadoop2,ens33.recv
+1546767160000,1,1224.0,hadoop2,ens33.send
+1546767160000,2,1164.2,hadoop3,ens33.recv
+1546767160000,3,1917.0,hadoop3,ens33.send
+1546767165000,0,308.2,hadoop2,ens33.recv
+1546767165000,1,1297.2,hadoop2,ens33.send
+1546767165000,2,1216.4,hadoop3,ens33.recv
+1546767165000,3,4147.0,hadoop3,ens33.send
+1546767170000,0,2362.6,hadoop2,ens33.recv
+1546767170000,1,1421.8,hadoop2,ens33.send
+1546767170000,2,1371.8,hadoop3,ens33.recv
+1546767170000,3,15812.6,hadoop3,ens33.send
+1546767175000,0,8127.2,hadoop2,ens33.recv
+1546767175000,1,1541.0,hadoop2,ens33.send
+1546767175000,2,1141.4,hadoop3,ens33.recv
+1546767175000,3,2159.2,hadoop3,ens33.send
+1546767180000,0,571.0,hadoop2,ens33.recv
+1546767180000,1,1443.2,hadoop2,ens33.send
+1546767180000,2,1321.6,hadoop3,ens33.recv
+1546767180000,3,2430.8,hadoop3,ens33.send
+1546767185000,0,663.0,hadoop2,ens33.recv
+1546767185000,1,1761.4,hadoop2,ens33.send
+1546767185000,2,1297.0,hadoop3,ens33.recv
+1546767185000,3,2446.2,hadoop3,ens33.send
+1546767190000,0,1841.2,hadoop2,ens33.recv
+1546767190000,1,2730.2,hadoop2,ens33.send
+1546767190000,2,2439.2,hadoop3,ens33.recv
+1546767190000,3,3437.0,hadoop3,ens33.send
+1546767195000,0,326.2,hadoop2,ens33.recv
+1546767195000,1,1318.4,hadoop2,ens33.send
+1546767195000,2,2827.4,hadoop3,ens33.recv
+1546767195000,3,3591.0,hadoop3,ens33.send
+1546767200000,0,5172.6,hadoop2,ens33.recv
+1546767200000,1,5513.0,hadoop2,ens33.send
+1546767200000,2,8061.4,hadoop3,ens33.recv
+1546767200000,3,9771.0,hadoop3,ens33.send
+1546767205000,0,7025.6,hadoop2,ens33.recv
+1546767205000,1,10299.2,hadoop2,ens33.send
+1546767205000,2,6368.4,hadoop3,ens33.recv
+1546767205000,3,12534.2,hadoop3,ens33.send
+1546767210000,0,14237.6,hadoop2,ens33.recv
+1546767210000,1,8036.6,hadoop2,ens33.send
+1546767210000,2,8041.2,hadoop3,ens33.recv
+1546767210000,3,18734.2,hadoop3,ens33.send
+1546767215000,0,1644.8,hadoop2,ens33.recv
+1546767215000,1,4632.2,hadoop2,ens33.send
+1546767215000,2,6122.4,hadoop3,ens33.recv
+1546767215000,3,4248.4,hadoop3,ens33.send
+1546767220000,0,3127.0,hadoop2,ens33.recv
+1546767220000,1,6698.4,hadoop2,ens33.send
+1546767220000,2,4786.0,hadoop3,ens33.recv
+1546767220000,3,3655.6,hadoop3,ens33.send
+1546767225000,0,8406.6,hadoop2,ens33.recv
+1546767225000,1,7712.6,hadoop2,ens33.send
+1546767225000,2,8352.0,hadoop3,ens33.recv
+1546767225000,3,15747.4,hadoop3,ens33.send
+1546767230000,0,9069.6,hadoop2,ens33.recv
+1546767230000,1,9988.2,hadoop2,ens33.send
+1546767230000,2,9715.0,hadoop3,ens33.recv
+1546767230000,3,15777.8,hadoop3,ens33.send
+1546767235000,0,2477.0,hadoop2,ens33.recv
+1546767235000,1,5258.4,hadoop2,ens33.send
+1546767235000,2,4134.0,hadoop3,ens33.recv
+1546767235000,3,3835.2,hadoop3,ens33.send
+1546767240000,0,7691.8,hadoop2,ens33.recv
+1546767240000,1,13273.2,hadoop2,ens33.send
+1546767240000,2,11875.2,hadoop3,ens33.recv
+1546767240000,3,27326.8,hadoop3,ens33.send
+1546767245000,0,24237.2,hadoop2,ens33.recv
+1546767245000,1,12917.6,hadoop2,ens33.send
+1546767245000,2,6201.4,hadoop3,ens33.recv
+1546767245000,3,25472.0,hadoop3,ens33.send
+1546767250000,0,5765.6,hadoop2,ens33.recv
+1546767250000,1,2966.4,hadoop2,ens33.send
+1546767250000,2,3529.4,hadoop3,ens33.recv
+1546767250000,3,12397.8,hadoop3,ens33.send
+1546767255000,0,5318.4,hadoop2,ens33.recv
+1546767255000,1,2365.0,hadoop2,ens33.send
+1546767255000,2,2525.4,hadoop3,ens33.recv
+1546767255000,3,11105.4,hadoop3,ens33.send
+1546767260000,0,1160.2,hadoop2,ens33.recv
+1546767260000,1,2247.6,hadoop2,ens33.send
+1546767260000,2,1861.0,hadoop3,ens33.recv
+1546767260000,3,2903.0,hadoop3,ens33.send
+1546767265000,0,1889.0,hadoop2,ens33.recv
+1546767265000,1,3029.0,hadoop2,ens33.send
+1546767265000,2,4066.2,hadoop3,ens33.recv
+1546767265000,3,5994.0,hadoop3,ens33.send
+1546767270000,0,12660.4,hadoop2,ens33.recv
+1546767270000,1,8040.8,hadoop2,ens33.send
+1546767270000,2,7881.8,hadoop3,ens33.recv
+1546767270000,3,21370.4,hadoop3,ens33.send
+1546767275000,0,14737.8,hadoop2,ens33.recv
+1546767275000,1,15839.6,hadoop2,ens33.send
+1546767275000,2,13228.8,hadoop3,ens33.recv
+1546767275000,3,24787.2,hadoop3,ens33.send
+1546767280000,0,16549.6,hadoop2,ens33.recv
+1546767280000,1,12203.2,hadoop2,ens33.send
+1546767280000,2,8223.6,hadoop3,ens33.recv
+1546767280000,3,25544.6,hadoop3,ens33.send
+1546767285000,0,5646.0,hadoop2,ens33.recv
+1546767285000,1,4087.2,hadoop2,ens33.send
+1546767285000,2,4351.0,hadoop3,ens33.recv
+1546767285000,3,10186.2,hadoop3,ens33.send
+1546767290000,0,110622.2,hadoop2,ens33.recv
+1546767290000,1,4888.4,hadoop2,ens33.send
+1546767290000,2,10197.0,hadoop3,ens33.recv
+1546767290000,3,154811.6,hadoop3,ens33.send
+1546767295000,0,93001.4,hadoop2,ens33.recv
+1546767295000,1,23369.6,hadoop2,ens33.send
+1546767295000,2,74268.2,hadoop3,ens33.recv
+1546767295000,3,63854.6,hadoop3,ens33.send
+1546767300000,0,296.6,hadoop2,ens33.recv
+1546767300000,1,879.2,hadoop2,ens33.send
+1546767300000,2,1654.8,hadoop3,ens33.recv
+1546767300000,3,1901.6,hadoop3,ens33.send
+1546767305000,0,310.4,hadoop2,ens33.recv
+1546767305000,1,1010.2,hadoop2,ens33.send
+1546767305000,2,1709.0,hadoop3,ens33.recv
+1546767305000,3,23596.2,hadoop3,ens33.send
+1546767310000,0,24000.2,hadoop2,ens33.recv
+1546767310000,1,2374.0,hadoop2,ens33.send
+1546767310000,2,2346.8,hadoop3,ens33.recv
+1546767310000,3,7643.0,hadoop3,ens33.send
+1546767315000,0,234.0,hadoop2,ens33.recv
+1546767315000,1,1122.6,hadoop2,ens33.send
+1546767315000,2,1127.2,hadoop3,ens33.recv
+1546767315000,3,1925.4,hadoop3,ens33.send
+1546767320000,0,361.0,hadoop2,ens33.recv
+1546767320000,1,1374.4,hadoop2,ens33.send
+1546767320000,2,1227.6,hadoop3,ens33.recv
+1546767320000,3,1867.8,hadoop3,ens33.send
+1546767325000,0,602.2,hadoop2,ens33.recv
+1546767325000,1,1475.0,hadoop2,ens33.send
+1546767325000,2,1153.8,hadoop3,ens33.recv
+1546767325000,3,2085.6,hadoop3,ens33.send
+1546767330000,0,9179.2,hadoop2,ens33.recv
+1546767330000,1,3422.6,hadoop2,ens33.send
+1546767330000,2,6710.6,hadoop3,ens33.recv
+1546767330000,3,14804.4,hadoop3,ens33.send
+1546767335000,0,281.8,hadoop2,ens33.recv
+1546767335000,1,1425.2,hadoop2,ens33.send
+1546767335000,2,1177.0,hadoop3,ens33.recv
+1546767335000,3,3814.6,hadoop3,ens33.send
+1546767340000,2,2994.4,hadoop3,ens33.recv
+1546767340000,3,12445.4,hadoop3,ens33.send
+1546767345000,2,2687.4,hadoop3,ens33.recv
+1546767345000,3,5551.4,hadoop3,ens33.send
+1546767340000,0,12371.4,hadoop2,ens33.recv
+1546767340000,1,5535.6,hadoop2,ens33.send
+1546767345000,2,1331.6,hadoop3,ens33.recv
+1546767345000,3,3664.4,hadoop3,ens33.send
+1546767350000,0,990.0,hadoop2,ens33.recv
+1546767350000,1,909.4,hadoop2,ens33.send
+1546767350000,2,1196.2,hadoop3,ens33.recv
+1546767350000,3,3271.8,hadoop3,ens33.send
+1546767355000,0,255.6,hadoop2,ens33.recv
+1546767355000,1,657.0,hadoop2,ens33.send
+1546767355000,2,1640.0,hadoop3,ens33.recv
+1546767355000,3,2406.8,hadoop3,ens33.send
+1546767360000,0,2025.0,hadoop2,ens33.recv
+1546767360000,1,749.8,hadoop2,ens33.send
+1546767360000,2,1431.0,hadoop3,ens33.recv
+1546767360000,3,5529.4,hadoop3,ens33.send
+1546767365000,0,364.4,hadoop2,ens33.recv
+1546767365000,1,1151.4,hadoop2,ens33.send
+1546767365000,2,3087.2,hadoop3,ens33.recv
+1546767365000,3,3441.2,hadoop3,ens33.send
+1546767370000,0,342.8,hadoop2,ens33.recv
+1546767370000,1,1328.4,hadoop2,ens33.send
+1546767370000,2,1690.4,hadoop3,ens33.recv
+1546767370000,3,2535.0,hadoop3,ens33.send
+1546767375000,0,173.6,hadoop2,ens33.recv
+1546767375000,1,700.8,hadoop2,ens33.send
+1546767375000,2,1103.2,hadoop3,ens33.recv
+1546767375000,3,1964.8,hadoop3,ens33.send
+1546767380000,0,301.8,hadoop2,ens33.recv
+1546767380000,1,968.8,hadoop2,ens33.send
+1546767380000,2,1893.6,hadoop3,ens33.recv
+1546767380000,3,4741.6,hadoop3,ens33.send
+1546767385000,0,5909.0,hadoop2,ens33.recv
+1546767385000,1,1536.8,hadoop2,ens33.send
+1546767385000,2,1345.6,hadoop3,ens33.recv
+1546767385000,3,10599.6,hadoop3,ens33.send
+1546767390000,0,339.4,hadoop2,ens33.recv
+1546767390000,1,1345.4,hadoop2,ens33.send
+1546767390000,2,1252.4,hadoop3,ens33.recv
+1546767390000,3,2110.4,hadoop3,ens33.send
+1546767395000,0,246.0,hadoop2,ens33.recv
+1546767395000,1,1156.2,hadoop2,ens33.send
+1546767395000,2,1449.6,hadoop3,ens33.recv
+1546767395000,3,2380.8,hadoop3,ens33.send
+1546767400000,0,567.6,hadoop2,ens33.recv
+1546767400000,1,1963.6,hadoop2,ens33.send
+1546767400000,2,1771.6,hadoop3,ens33.recv
+1546767400000,3,2606.4,hadoop3,ens33.send
+1546767405000,0,839.8,hadoop2,ens33.recv
+1546767405000,1,2746.8,hadoop2,ens33.send
+1546767405000,2,3071.0,hadoop3,ens33.recv
+1546767405000,3,2910.6,hadoop3,ens33.send
+1546767410000,0,1642.8,hadoop2,ens33.recv
+1546767410000,1,3911.6,hadoop2,ens33.send
+1546767410000,2,4104.2,hadoop3,ens33.recv
+1546767410000,3,3559.0,hadoop3,ens33.send
+1546767415000,0,4346.6,hadoop2,ens33.recv
+1546767415000,1,3130.2,hadoop2,ens33.send
+1546767415000,2,3156.2,hadoop3,ens33.recv
+1546767415000,3,9043.8,hadoop3,ens33.send
+1546767420000,0,13538.2,hadoop2,ens33.recv
+1546767420000,1,5581.4,hadoop2,ens33.send
+1546767420000,2,5444.4,hadoop3,ens33.recv
+1546767420000,3,23732.0,hadoop3,ens33.send
+1546767425000,0,3476.2,hadoop2,ens33.recv
+1546767425000,1,1287.2,hadoop2,ens33.send
+1546767425000,2,1752.8,hadoop3,ens33.recv
+1546767425000,3,8340.0,hadoop3,ens33.send
+1546767430000,0,3351.6,hadoop2,ens33.recv
+1546767430000,1,1358.0,hadoop2,ens33.send
+1546767430000,2,1827.4,hadoop3,ens33.recv
+1546767430000,3,7446.8,hadoop3,ens33.send
+1546767435000,0,397.4,hadoop2,ens33.recv
+1546767435000,1,769.2,hadoop2,ens33.send
+1546767435000,2,1144.8,hadoop3,ens33.recv
+1546767435000,3,2321.2,hadoop3,ens33.send
+1546767440000,0,428.0,hadoop2,ens33.recv
+1546767440000,1,838.4,hadoop2,ens33.send
+1546767440000,2,1125.6,hadoop3,ens33.recv
+1546767440000,3,2347.2,hadoop3,ens33.send
+1546767445000,0,797.8,hadoop2,ens33.recv
+1546767445000,1,1257.0,hadoop2,ens33.send
+1546767445000,2,2668.0,hadoop3,ens33.recv
+1546767445000,3,3601.0,hadoop3,ens33.send
+1546767450000,0,948.8,hadoop2,ens33.recv
+1546767450000,1,1789.8,hadoop2,ens33.send
+1546767450000,2,1131.0,hadoop3,ens33.recv
+1546767450000,3,2217.0,hadoop3,ens33.send
+1546767455000,0,3070.2,hadoop2,ens33.recv
+1546767455000,1,2576.4,hadoop2,ens33.send
+1546767455000,2,2934.0,hadoop3,ens33.recv
+1546767455000,3,4399.4,hadoop3,ens33.send
+1546767460000,0,2313.4,hadoop2,ens33.recv
+1546767460000,1,3506.8,hadoop2,ens33.send
+1546767460000,2,3074.4,hadoop3,ens33.recv
+1546767460000,3,2892.0,hadoop3,ens33.send
+1546767465000,0,1346.6,hadoop2,ens33.recv
+1546767465000,1,4677.0,hadoop2,ens33.send
+1546767465000,2,4032.8,hadoop3,ens33.recv
+1546767465000,3,2957.6,hadoop3,ens33.send
+1546767470000,0,11358.4,hadoop2,ens33.recv
+1546767470000,1,5083.0,hadoop2,ens33.send
+1546767470000,2,5005.8,hadoop3,ens33.recv
+1546767470000,3,19995.8,hadoop3,ens33.send
+1546767475000,0,1997.2,hadoop2,ens33.recv
+1546767475000,1,2350.8,hadoop2,ens33.send
+1546767475000,2,2730.2,hadoop3,ens33.recv
+1546767475000,3,5089.6,hadoop3,ens33.send
+1546767480000,0,880.2,hadoop2,ens33.recv
+1546767480000,1,2242.8,hadoop2,ens33.send
+1546767480000,2,1937.6,hadoop3,ens33.recv
+1546767480000,3,2656.4,hadoop3,ens33.send
+1546767485000,0,1546.4,hadoop2,ens33.recv
+1546767485000,1,3012.8,hadoop2,ens33.send
+1546767485000,2,2734.6,hadoop3,ens33.recv
+1546767485000,3,3176.8,hadoop3,ens33.send
+1546767490000,0,7260.2,hadoop2,ens33.recv
+1546767490000,1,5749.8,hadoop2,ens33.send
+1546767490000,2,5090.0,hadoop3,ens33.recv
+1546767490000,3,10759.4,hadoop3,ens33.send
+1546767495000,0,9990.6,hadoop2,ens33.recv
+1546767495000,1,7053.2,hadoop2,ens33.send
+1546767495000,2,7997.4,hadoop3,ens33.recv
+1546767495000,3,17513.0,hadoop3,ens33.send
+1546767500000,0,18614.8,hadoop2,ens33.recv
+1546767500000,1,10132.2,hadoop2,ens33.send
+1546767500000,2,7549.6,hadoop3,ens33.recv
+1546767500000,3,33145.2,hadoop3,ens33.send
+1546767505000,0,6435.0,hadoop2,ens33.recv
+1546767505000,1,3794.0,hadoop2,ens33.send
+1546767505000,2,2620.2,hadoop3,ens33.recv
+1546767505000,3,10868.4,hadoop3,ens33.send
+1546767510000,0,1136.2,hadoop2,ens33.recv
+1546767510000,1,2247.6,hadoop2,ens33.send
+1546767510000,2,2209.8,hadoop3,ens33.recv
+1546767510000,3,3148.6,hadoop3,ens33.send
+1546767515000,0,1008.8,hadoop2,ens33.recv
+1546767515000,1,2115.0,hadoop2,ens33.send
+1546767515000,2,2183.8,hadoop3,ens33.recv
+1546767515000,3,3143.0,hadoop3,ens33.send
+1546767520000,0,7470.4,hadoop2,ens33.recv
+1546767520000,1,5208.0,hadoop2,ens33.send
+1546767520000,2,6746.0,hadoop3,ens33.recv
+1546767520000,3,14429.4,hadoop3,ens33.send
+1546767525000,0,7808.2,hadoop2,ens33.recv
+1546767525000,1,10413.0,hadoop2,ens33.send
+1546767525000,2,8630.4,hadoop3,ens33.recv
+1546767525000,3,15237.2,hadoop3,ens33.send
+1546767530000,0,21087.4,hadoop2,ens33.recv
+1546767530000,1,10652.4,hadoop2,ens33.send
+1546767530000,2,9389.2,hadoop3,ens33.recv
+1546767530000,3,36522.8,hadoop3,ens33.send
+1546767535000,0,10703.4,hadoop2,ens33.recv
+1546767535000,1,9488.8,hadoop2,ens33.send
+1546767535000,2,6113.4,hadoop3,ens33.recv
+1546767535000,3,16644.8,hadoop3,ens33.send
+1546767540000,0,3381.6,hadoop2,ens33.recv
+1546767540000,1,3340.2,hadoop2,ens33.send
+1546767540000,2,3020.2,hadoop3,ens33.recv
+1546767540000,3,7144.8,hadoop3,ens33.send
+1546767545000,0,10630.4,hadoop2,ens33.recv
+1546767545000,1,4622.8,hadoop2,ens33.send
+1546767545000,2,5775.6,hadoop3,ens33.recv
+1546767545000,3,18916.0,hadoop3,ens33.send
+1546767550000,0,137156.2,hadoop2,ens33.recv
+1546767550000,1,13159.8,hadoop2,ens33.send
+1546767550000,2,14672.4,hadoop3,ens33.recv
+1546767550000,3,156150.6,hadoop3,ens33.send</pre>
+    <pre id="csv_network_overall" style="display: none">x,recv_bytes,send_bytes,|recv_packets,send_packets,errors
+1546766865000,148723.2,82046.8,137.0,100.8,0.0
+1546766870000,22564.0,31646.6,34.8,41.0,0.0
+1546766875000,5465.8,4579.2,21.0,21.8,0.0
+1546766880000,1711.8,3828.8,16.0,18.2,0.0
+1546766885000,1759.4,3744.8,16.2,17.6,0.0
+1546766890000,6902.0,8250.6,44.2,49.2,0.0
+1546766895000,286.6,1279.8,3.4,4.8,0.0
+1546766900000,3244.6,3897.4,20.4,21.8,0.0
+1546766905000,6424.6,7846.4,40.6,54.6,0.0
+1546766910000,835.8,1849.4,8.6,10.4,0.0
+1546766915000,1770.4,3518.2,19.2,22.0,0.0
+1546766920000,942.8,2151.8,10.0,11.4,0.0
+1546766925000,934.2,2363.4,9.8,12.4,0.0
+1546766930000,865.4,2121.4,10.0,11.8,0.0
+1546766935000,921.0,2341.0,10.6,12.8,0.0
+1546766940000,1801.8,3474.4,18.2,21.4,0.0
+1546766945000,628.2,1893.6,7.8,9.4,0.0
+1546766950000,600.2,1971.0,8.2,10.8,0.0
+1546766955000,690.2,1997.0,8.2,9.8,0.0
+1546766960000,1007.6,2127.2,10.8,12.0,0.0
+1546766965000,1423.4,2385.2,10.0,11.8,0.0
+1546766970000,1046.2,2626.0,12.6,13.8,0.0
+1546766975000,1157.0,2986.6,12.4,14.8,0.0
+1546766980000,1315.8,3597.6,14.6,19.0,0.0
+1546766985000,1680.4,3576.8,15.6,18.4,0.0
+1546766990000,1188.6,3064.8,14.6,17.8,0.0
+1546766995000,2671.8,3920.0,18.2,23.0,0.0
+1546767000000,3072.6,5388.0,20.6,23.8,0.0
+1546767005000,3858.6,6475.2,33.0,37.0,0.0
+1546767010000,1525.0,3783.0,15.2,19.6,0.0
+1546767015000,1693.8,3755.2,16.2,18.6,0.0
+1546767020000,1360.8,3318.2,13.6,15.8,0.0
+1546767025000,1764.2,3724.6,16.2,18.8,0.0
+1546767030000,1425.4,3635.0,14.0,17.2,0.0
+1546767035000,1461.8,2685.0,11.0,13.0,0.0
+1546767040000,1986.6,7987.6,16.8,21.4,0.0
+1546767045000,4734.8,3896.0,17.6,17.8,0.0
+1546767050000,1757.6,3753.0,16.0,17.4,0.0
+1546767055000,8141.6,11129.8,20.4,21.6,0.0
+1546767060000,20928.8,37383.6,42.6,43.8,0.0
+1546767065000,1344.2,3013.0,12.6,13.4,0.0
+1546767070000,1321.8,2829.2,12.6,13.2,0.0
+1546767075000,1331.2,2916.6,12.6,13.2,0.0
+1546767080000,1553.0,3132.0,14.2,15.0,0.0
+1546767085000,1374.4,2960.2,13.2,13.8,0.0
+1546767090000,1541.0,3154.6,15.0,15.8,0.0
+1546767095000,1357.6,3039.4,12.8,13.8,0.0
+1546767100000,3062.8,3899.0,19.0,22.0,0.0
+1546767105000,240.8,739.8,3.4,3.8,0.0
+1546767110000,227.6,726.8,3.2,3.6,0.0
+1546767105000,2404.6,2763.2,12.6,15.8,0.0
+1546767115000,1018.6,2093.0,10.8,12.8,0.0
+1546767120000,895.6,2046.6,9.6,10.8,0.0
+1546767125000,1293.8,2361.4,12.2,12.4,0.0
+1546767130000,1038.0,2083.2,11.0,12.8,0.0
+1546767135000,1576.2,3069.4,16.6,19.6,0.0
+1546767140000,891.8,2078.4,10.4,13.0,0.0
+1546767145000,387.6,1210.2,5.6,5.8,0.0
+1546767150000,450.2,1602.6,6.2,7.6,0.0
+1546767155000,1158.8,2946.6,13.2,16.0,0.0
+1546767160000,1442.6,3141.0,12.4,15.0,0.0
+1546767165000,1524.6,5444.2,14.0,18.2,0.0
+1546767170000,3734.4,17234.4,20.4,25.6,0.0
+1546767175000,9268.6,3700.2,22.2,20.6,0.0
+1546767180000,1892.6,3874.0,16.8,18.8,0.0
+1546767185000,1960.0,4207.6,24.0,26.8,0.0
+1546767190000,4280.4,6167.2,26.4,28.8,0.0
+1546767195000,3153.6,4909.4,22.0,26.6,0.0
+1546767200000,13234.0,15284.0,87.2,86.8,0.0
+1546767205000,13394.0,22833.4,76.2,85.4,0.0
+1546767210000,22278.8,26770.8,87.6,91.0,0.0
+1546767215000,7767.2,8880.6,41.0,39.0,0.0
+1546767220000,7913.0,10354.0,41.8,47.0,0.0
+1546767225000,16758.6,23460.0,69.4,74.2,0.0
+1546767230000,18784.6,25766.0,96.8,105.8,0.0
+1546767235000,6611.0,9093.6,41.8,48.4,0.0
+1546767240000,19567.0,40600.0,116.2,128.8,0.0
+1546767245000,30438.6,38389.6,90.4,101.4,0.0
+1546767250000,9295.0,15364.2,48.6,55.0,0.0
+1546767255000,7843.8,13470.4,36.8,40.2,0.0
+1546767260000,3021.2,5150.6,23.4,25.8,0.0
+1546767265000,5955.2,9023.0,47.8,51.4,0.0
+1546767270000,20542.2,29411.2,100.6,109.0,0.0
+1546767275000,27966.6,40626.8,145.0,159.2,0.0
+1546767280000,24773.2,37747.8,105.2,122.6,0.0
+1546767285000,9997.0,14273.4,53.2,59.0,0.0
+1546767290000,120819.2,159700.0,176.6,204.4,0.0
+1546767295000,167269.6,87224.2,149.2,99.4,0.0
+1546767300000,1951.4,2780.8,12.6,17.0,0.0
+1546767305000,2019.4,24606.4,18.6,36.0,0.0
+1546767310000,26347.0,10017.0,40.6,31.8,0.0
+1546767315000,1361.2,3048.0,12.6,13.4,0.0
+1546767320000,1588.6,3242.2,15.2,16.2,0.0
+1546767325000,1756.0,3560.6,16.4,17.8,0.0
+1546767330000,15889.8,18227.0,58.2,65.4,0.0
+1546767335000,1458.8,5239.8,13.8,18.4,0.0
+1546767340000,2994.4,12445.4,26.2,29.2,0.0
+1546767345000,2687.4,5551.4,20.4,21.0,0.0
+1546767340000,12371.4,5535.6,36.2,43.0,0.0
+1546767345000,1331.6,3664.4,10.8,12.2,0.0
+1546767350000,2186.2,4181.2,17.0,18.4,0.0
+1546767355000,1895.6,3063.8,15.6,18.4,0.0
+1546767360000,3456.0,6279.2,16.8,17.6,0.0
+1546767365000,3451.6,4592.6,22.0,27.0,0.0
+1546767370000,2033.2,3863.4,17.0,18.8,0.0
+1546767375000,1276.8,2665.6,12.2,12.8,0.0
+1546767380000,2195.4,5710.4,22.6,27.2,0.0
+1546767385000,7254.6,12136.4,21.8,23.6,0.0
+1546767390000,1591.8,3455.8,14.4,15.8,0.0
+1546767395000,1695.6,3537.0,14.4,15.8,0.0
+1546767400000,2339.2,4570.0,19.8,22.2,0.0
+1546767405000,3910.8,5657.4,27.4,28.4,0.0
+1546767410000,5747.0,7470.6,38.2,43.4,0.0
+1546767415000,7502.8,12174.0,33.4,37.4,0.0
+1546767420000,18982.6,29313.4,67.2,71.8,0.0
+1546767425000,5229.0,9627.2,20.6,23.4,0.0
+1546767430000,5179.0,8804.8,22.8,24.6,0.0
+1546767435000,1542.2,3090.4,14.0,14.4,0.0
+1546767440000,1553.6,3185.6,14.2,15.4,0.0
+1546767445000,3465.8,4858.0,29.6,27.8,0.0
+1546767450000,2079.8,4006.8,15.4,18.4,0.0
+1546767455000,6004.2,6975.8,41.8,41.8,0.0
+1546767460000,5387.8,6398.8,30.6,35.2,0.0
+1546767465000,5379.4,7634.6,33.4,36.4,0.0
+1546767470000,16364.2,25078.8,70.4,72.6,0.0
+1546767475000,4727.4,7440.4,25.6,26.6,0.0
+1546767480000,2817.8,4899.2,20.8,22.6,0.0
+1546767485000,4281.0,6189.6,28.4,30.2,0.0
+1546767490000,12350.2,16509.2,63.0,68.4,0.0
+1546767495000,17988.0,24566.2,88.8,97.8,0.0
+1546767500000,26164.4,43277.4,111.2,129.2,0.0
+1546767505000,9055.2,14662.4,32.8,37.2,0.0
+1546767510000,3346.0,5396.2,25.4,27.0,0.0
+1546767515000,3192.6,5258.0,28.0,29.8,0.0
+1546767520000,14216.4,19637.4,80.0,83.8,0.0
+1546767525000,16438.6,25650.2,106.8,121.2,0.0
+1546767530000,30476.6,47175.2,123.4,136.8,0.0
+1546767535000,16816.8,26133.6,71.6,83.8,0.0
+1546767540000,6401.8,10485.0,38.6,42.8,0.0
+1546767545000,16406.0,23538.8,77.0,86.8,0.0
+1546767550000,151828.6,169310.4,239.6,257.4,0.0</pre>
+    <pre id="csv_diskio_heatmap" style="display: none">x,y,value,hostname,diskid
+1546766865000,0,38502.4,hadoop2,sda
+1546766865000,1,481689.6,hadoop3,sda
+1546766870000,0,55705.6,hadoop2,sda
+1546766870000,1,1343488.0,hadoop3,sda
+1546766875000,0,352256.0,hadoop2,sda
+1546766875000,1,131072.0,hadoop3,sda
+1546766880000,0,118784.0,hadoop2,sda
+1546766880000,1,46694.4,hadoop3,sda
+1546766885000,0,13107.2,hadoop2,sda
+1546766885000,1,103219.2,hadoop3,sda
+1546766890000,0,105676.8,hadoop2,sda
+1546766890000,1,31129.6,hadoop3,sda
+1546766895000,0,40140.8,hadoop2,sda
+1546766900000,1,69360025.6,hadoop3,sda
+1546766905000,0,28974284.8,hadoop2,sda
+1546766905000,1,25300172.8,hadoop3,sda
+1546766910000,1,7566950.4,hadoop3,sda
+1546766915000,0,35561472.0,hadoop2,sda
+1546766915000,1,8077312.0,hadoop3,sda
+1546766920000,0,7103283.2,hadoop2,sda
+1546766920000,1,7584153.6,hadoop3,sda
+1546766925000,0,19991756.8,hadoop2,sda
+1546766925000,1,6113689.6,hadoop3,sda
+1546766930000,0,16472473.6,hadoop2,sda
+1546766930000,1,4730060.8,hadoop3,sda
+1546766935000,0,12947456.0,hadoop2,sda
+1546766935000,1,6198067.2,hadoop3,sda
+1546766940000,0,29018521.6,hadoop2,sda
+1546766940000,1,15916236.8,hadoop3,sda
+1546766945000,0,6592921.6,hadoop2,sda
+1546766945000,1,3457024.0,hadoop3,sda
+1546766950000,0,2342092.8,hadoop2,sda
+1546766950000,1,1106739.2,hadoop3,sda
+1546766955000,0,10045030.4,hadoop2,sda
+1546766955000,1,4547379.2,hadoop3,sda
+1546766960000,0,19412582.4,hadoop2,sda
+1546766960000,1,1647411.2,hadoop3,sda
+1546766965000,0,9206169.6,hadoop2,sda
+1546766965000,1,848691.2,hadoop3,sda
+1546766970000,0,7068057.6,hadoop2,sda
+1546766970000,1,353894.4,hadoop3,sda
+1546766975000,0,3706060.8,hadoop2,sda
+1546766975000,1,3022028.8,hadoop3,sda
+1546766980000,0,10279321.6,hadoop2,sda
+1546766980000,1,683212.8,hadoop3,sda
+1546766985000,0,14253260.8,hadoop2,sda
+1546766985000,1,1803878.4,hadoop3,sda
+1546766990000,0,8033894.4,hadoop2,sda
+1546766990000,1,929792.0,hadoop3,sda
+1546766995000,0,5973606.4,hadoop2,sda
+1546766995000,1,1035468.8,hadoop3,sda
+1546767000000,0,2048000.0,hadoop2,sda
+1546767000000,1,616857.6,hadoop3,sda
+1546767005000,0,3564339.2,hadoop2,sda
+1546767005000,1,1683456.0,hadoop3,sda
+1546767010000,0,2381414.4,hadoop2,sda
+1546767010000,1,2067660.8,hadoop3,sda
+1546767015000,0,1181286.4,hadoop2,sda
+1546767015000,1,1241907.2,hadoop3,sda
+1546767020000,0,1088716.8,hadoop2,sda
+1546767020000,1,1178828.8,hadoop3,sda
+1546767025000,0,993689.6,hadoop2,sda
+1546767025000,1,1627750.4,hadoop3,sda
+1546767030000,0,629145.6,hadoop2,sda
+1546767030000,1,1557299.2,hadoop3,sda
+1546767035000,0,721715.2,hadoop2,sda
+1546767035000,1,1074790.4,hadoop3,sda
+1546767040000,0,753664.0,hadoop2,sda
+1546767040000,1,1290240.0,hadoop3,sda
+1546767045000,0,914227.2,hadoop2,sda
+1546767045000,1,1630208.0,hadoop3,sda
+1546767050000,0,684851.2,hadoop2,sda
+1546767050000,1,1600716.8,hadoop3,sda
+1546767055000,0,1520435.2,hadoop2,sda
+1546767055000,1,3803545.6,hadoop3,sda
+1546767060000,0,695500.8,hadoop2,sda
+1546767060000,1,1598259.2,hadoop3,sda
+1546767065000,0,664371.2,hadoop2,sda
+1546767065000,1,1703116.8,hadoop3,sda
+1546767070000,0,764313.6,hadoop2,sda
+1546767070000,1,1070694.4,hadoop3,sda
+1546767075000,0,693862.4,hadoop2,sda
+1546767075000,1,757760.0,hadoop3,sda
+1546767080000,0,846233.6,hadoop2,sda
+1546767080000,1,842956.8,hadoop3,sda
+1546767085000,0,560332.8,hadoop2,sda
+1546767085000,1,842137.6,hadoop3,sda
+1546767090000,0,487424.0,hadoop2,sda
+1546767090000,1,1024819.2,hadoop3,sda
+1546767095000,0,466124.8,hadoop2,sda
+1546767095000,1,765952.0,hadoop3,sda
+1546767100000,0,607027.2,hadoop2,sda
+1546767100000,1,636518.4,hadoop3,sda
+1546767105000,0,684851.2,hadoop2,sda
+1546767110000,0,172032.0,hadoop2,sda
+1546767105000,1,14435942.4,hadoop3,sda
+1546767115000,0,239206.4,hadoop2,sda
+1546767115000,1,26057113.6,hadoop3,sda
+1546767120000,0,127795.2,hadoop2,sda
+1546767120000,1,15944089.6,hadoop3,sda
+1546767125000,0,108953.6,hadoop2,sda
+1546767125000,1,27752857.6,hadoop3,sda
+1546767130000,0,153190.4,hadoop2,sda
+1546767130000,1,11214848.0,hadoop3,sda
+1546767135000,0,212992.0,hadoop2,sda
+1546767135000,1,11996364.8,hadoop3,sda
+1546767140000,0,193331.2,hadoop2,sda
+1546767140000,1,8136294.4,hadoop3,sda
+1546767145000,0,305561.6,hadoop2,sda
+1546767145000,1,1481113.6,hadoop3,sda
+1546767150000,0,603750.4,hadoop2,sda
+1546767150000,1,1438515.2,hadoop3,sda
+1546767155000,0,2081587.2,hadoop2,sda
+1546767155000,1,4495769.6,hadoop3,sda
+1546767160000,0,1937408.0,hadoop2,sda
+1546767160000,1,3511091.2,hadoop3,sda
+1546767165000,0,2437120.0,hadoop2,sda
+1546767165000,1,3969024.0,hadoop3,sda
+1546767170000,0,1079705.6,hadoop2,sda
+1546767170000,1,7440793.6,hadoop3,sda
+1546767175000,0,1363968.0,hadoop2,sda
+1546767175000,1,2315059.2,hadoop3,sda
+1546767180000,0,1197670.4,hadoop2,sda
+1546767180000,1,2819686.4,hadoop3,sda
+1546767185000,0,1141145.6,hadoop2,sda
+1546767185000,1,1662976.0,hadoop3,sda
+1546767190000,0,836403.2,hadoop2,sda
+1546767190000,1,1308262.4,hadoop3,sda
+1546767195000,0,1363968.0,hadoop2,sda
+1546767195000,1,987955.2,hadoop3,sda
+1546767200000,0,1091174.4,hadoop2,sda
+1546767200000,1,2076672.0,hadoop3,sda
+1546767205000,0,5500108.8,hadoop2,sda
+1546767205000,1,3436544.0,hadoop3,sda
+1546767210000,0,7625932.8,hadoop2,sda
+1546767210000,1,8445952.0,hadoop3,sda
+1546767215000,0,2702540.8,hadoop2,sda
+1546767215000,1,3394764.8,hadoop3,sda
+1546767220000,0,2208563.2,hadoop2,sda
+1546767220000,1,2729574.4,hadoop3,sda
+1546767225000,0,14997913.6,hadoop2,sda
+1546767225000,1,1471283.2,hadoop3,sda
+1546767230000,0,2461696.0,hadoop2,sda
+1546767230000,1,1155891.2,hadoop3,sda
+1546767235000,0,1964441.6,hadoop2,sda
+1546767235000,1,1358233.6,hadoop3,sda
+1546767240000,0,3740467.2,hadoop2,sda
+1546767240000,1,2817228.8,hadoop3,sda
+1546767245000,0,349798.4,hadoop2,sda
+1546767245000,1,648806.4,hadoop3,sda
+1546767250000,0,182681.6,hadoop2,sda
+1546767250000,1,398950.4,hadoop3,sda
+1546767255000,0,142540.8,hadoop2,sda
+1546767255000,1,1252556.8,hadoop3,sda
+1546767260000,0,195788.8,hadoop2,sda
+1546767260000,1,95027.2,hadoop3,sda
+1546767265000,0,40140.8,hadoop2,sda
+1546767265000,1,961740.8,hadoop3,sda
+1546767270000,0,172032.0,hadoop2,sda
+1546767270000,1,483328.0,hadoop3,sda
+1546767275000,0,421068.8,hadoop2,sda
+1546767275000,1,439091.2,hadoop3,sda
+1546767280000,0,340787.2,hadoop2,sda
+1546767280000,1,344064.0,hadoop3,sda
+1546767285000,0,95846.4,hadoop2,sda
+1546767285000,1,95027.2,hadoop3,sda
+1546767290000,0,98304.0,hadoop2,sda
+1546767290000,1,1413939.2,hadoop3,sda
+1546767295000,0,346521.6,hadoop2,sda
+1546767295000,1,1078886.4,hadoop3,sda
+1546767300000,0,151552.0,hadoop2,sda
+1546767300000,1,1379532.8,hadoop3,sda
+1546767305000,0,29491.2,hadoop2,sda
+1546767305000,1,1617920.0,hadoop3,sda
+1546767310000,0,651264.0,hadoop2,sda
+1546767310000,1,480870.4,hadoop3,sda
+1546767315000,0,379289.6,hadoop2,sda
+1546767315000,1,2101248.0,hadoop3,sda
+1546767320000,0,37683.2,hadoop2,sda
+1546767320000,1,1572044.8,hadoop3,sda
+1546767325000,0,240844.8,hadoop2,sda
+1546767325000,1,1191936.0,hadoop3,sda
+1546767330000,0,290816.0,hadoop2,sda
+1546767330000,1,122880.0,hadoop3,sda
+1546767335000,0,9830.4,hadoop2,sda
+1546767335000,1,27036057.6,hadoop3,sda
+1546767340000,1,15166668.8,hadoop3,sda
+1546767345000,1,11856281.6,hadoop3,sda
+1546767340000,0,28223897.6,hadoop2,sda
+1546767345000,1,4492492.8,hadoop3,sda
+1546767350000,0,36307763.2,hadoop2,sda
+1546767350000,1,1801420.8,hadoop3,sda
+1546767355000,0,19449446.4,hadoop2,sda
+1546767355000,1,937164.8,hadoop3,sda
+1546767360000,0,22971187.2,hadoop2,sda
+1546767360000,1,3167846.4,hadoop3,sda
+1546767365000,0,29764812.8,hadoop2,sda
+1546767365000,1,511180.8,hadoop3,sda
+1546767370000,0,18045337.6,hadoop2,sda
+1546767370000,1,7091814.4,hadoop3,sda
+1546767375000,0,9803366.4,hadoop2,sda
+1546767375000,1,5635276.8,hadoop3,sda
+1546767380000,0,7322009.6,hadoop2,sda
+1546767380000,1,3733913.6,hadoop3,sda
+1546767385000,0,403865.6,hadoop2,sda
+1546767385000,1,1860403.2,hadoop3,sda
+1546767390000,0,12582912.0,hadoop2,sda
+1546767390000,1,581632.0,hadoop3,sda
+1546767395000,0,14424473.6,hadoop2,sda
+1546767395000,1,5895782.4,hadoop3,sda
+1546767400000,0,13758464.0,hadoop2,sda
+1546767400000,1,2354380.8,hadoop3,sda
+1546767405000,0,15809740.8,hadoop2,sda
+1546767405000,1,2183987.2,hadoop3,sda
+1546767410000,0,9297100.8,hadoop2,sda
+1546767410000,1,826572.8,hadoop3,sda
+1546767415000,0,5011046.4,hadoop2,sda
+1546767415000,1,569344.0,hadoop3,sda
+1546767420000,0,5394432.0,hadoop2,sda
+1546767420000,1,1319731.2,hadoop3,sda
+1546767425000,0,1480294.4,hadoop2,sda
+1546767425000,1,2123366.4,hadoop3,sda
+1546767430000,0,8437760.0,hadoop2,sda
+1546767430000,1,579993.6,hadoop3,sda
+1546767435000,0,1642496.0,hadoop2,sda
+1546767435000,1,958464.0,hadoop3,sda
+1546767440000,0,1780121.6,hadoop2,sda
+1546767440000,1,394854.4,hadoop3,sda
+1546767445000,0,1774387.2,hadoop2,sda
+1546767445000,1,29491.2,hadoop3,sda
+1546767450000,0,2258534.4,hadoop2,sda
+1546767450000,1,45056.0,hadoop3,sda
+1546767455000,0,1856307.2,hadoop2,sda
+1546767455000,1,171212.8,hadoop3,sda
+1546767460000,0,13891174.4,hadoop2,sda
+1546767460000,1,321126.4,hadoop3,sda
+1546767465000,0,6157107.2,hadoop2,sda
+1546767465000,1,108134.4,hadoop3,sda
+1546767470000,0,11506483.2,hadoop2,sda
+1546767470000,1,5051187.2,hadoop3,sda
+1546767475000,0,3470131.2,hadoop2,sda
+1546767475000,1,47513.6,hadoop3,sda
+1546767480000,0,4777574.4,hadoop2,sda
+1546767480000,1,94208.0,hadoop3,sda
+1546767485000,0,3250585.6,hadoop2,sda
+1546767485000,1,85196.8,hadoop3,sda
+1546767490000,0,2232320.0,hadoop2,sda
+1546767490000,1,62259.2,hadoop3,sda
+1546767495000,0,743014.4,hadoop2,sda
+1546767495000,1,491520.0,hadoop3,sda
+1546767500000,0,774963.2,hadoop2,sda
+1546767500000,1,2130739.2,hadoop3,sda
+1546767505000,0,519372.8,hadoop2,sda
+1546767505000,1,582451.2,hadoop3,sda
+1546767510000,0,39321.6,hadoop2,sda
+1546767510000,1,71270.4,hadoop3,sda
+1546767515000,0,122060.8,hadoop2,sda
+1546767515000,1,72908.8,hadoop3,sda
+1546767520000,0,67174.4,hadoop2,sda
+1546767520000,1,252313.6,hadoop3,sda
+1546767525000,0,453836.8,hadoop2,sda
+1546767525000,1,471040.0,hadoop3,sda
+1546767530000,0,257228.8,hadoop2,sda
+1546767530000,1,533299.2,hadoop3,sda
+1546767535000,0,577536.0,hadoop2,sda
+1546767535000,1,896204.8,hadoop3,sda
+1546767540000,0,85196.8,hadoop2,sda
+1546767540000,1,375193.6,hadoop3,sda
+1546767545000,0,141721.6,hadoop2,sda
+1546767545000,1,388300.8,hadoop3,sda
+1546767550000,0,508723.2,hadoop2,sda
+1546767550000,1,842137.6,hadoop3,sda</pre>
+    <pre id="csv_diskio_overall" style="display: none">x,read_bytes,write_bytes,|read_io,write_io
+1546766865000,465305.6,54886.4,40.0,3.4
+1546766870000,1221427.2,177766.4,96.2,3.8
+1546766875000,362905.6,120422.4,35.6,1.8
+1546766880000,20480.0,144998.4,2.8,2.2
+1546766885000,9830.4,106496.0,2.0,15.8
+1546766890000,3276.8,133529.6,0.8,12.8
+1546766895000,0.0,40140.8,0.0,1.2
+1546766900000,12920422.4,56439603.2,1313.8,1635.2
+1546766905000,12100403.2,42174054.4,1497.2,383.6
+1546766910000,4164812.8,3402137.6,404.4,424.8
+1546766915000,5697536.0,37941248.0,642.2,1037.6
+1546766920000,5144576.0,9542860.8,590.8,460.6
+1546766925000,3682304.0,22423142.4,371.0,403.2
+1546766930000,3488153.6,17714380.8,280.8,439.2
+1546766935000,5065113.6,14080409.6,685.0,335.4
+1546766940000,18254233.6,26680524.8,2939.6,1097.4
+1546766945000,6666649.6,3383296.0,1021.4,151.0
+1546766950000,2259353.6,1189478.4,308.6,184.2
+1546766955000,6001459.2,8590950.4,843.6,1267.0
+1546766960000,11680153.6,9379840.0,1430.2,523.2
+1546766965000,2891776.0,7163084.8,341.6,704.2
+1546766970000,5652480.0,1769472.0,683.4,35.6
+1546766975000,2877849.6,3850240.0,345.0,107.2
+1546766980000,5716377.6,5246156.8,658.6,697.0
+1546766985000,6508544.0,9548595.2,791.4,520.2
+1546766990000,8856371.2,107315.2,1012.2,7.4
+1546766995000,1418854.4,5590220.8,175.2,666.4
+1546767000000,2641100.8,23756.8,280.6,2.4
+1546767005000,4308172.8,939622.4,535.0,78.8
+1546767010000,4401561.6,47513.6,526.6,3.2
+1546767015000,2401894.4,21299.2,400.8,2.0
+1546767020000,2238054.4,29491.2,339.2,3.8
+1546767025000,2590310.4,31129.6,292.0,4.6
+1546767030000,1900544.0,285900.8,261.2,45.2
+1546767035000,1499136.0,297369.6,233.2,28.2
+1546767040000,2011955.2,31948.8,265.0,5.4
+1546767045000,2437120.0,107315.2,302.2,14.8
+1546767050000,2277376.0,8192.0,296.8,1.6
+1546767055000,4058316.8,1265664.0,317.2,39.6
+1546767060000,2238054.4,55705.6,176.0,1.0
+1546767065000,2197094.4,170393.6,123.4,20.6
+1546767070000,1831731.2,3276.8,176.4,0.4
+1546767075000,1437696.0,13926.4,142.8,0.4
+1546767080000,1667891.2,21299.2,193.2,1.6
+1546767085000,1327104.0,75366.4,153.4,3.0
+1546767090000,1406566.4,105676.8,141.4,1.6
+1546767095000,1165721.6,66355.2,137.6,6.0
+1546767100000,1231257.6,12288.0,153.2,1.8
+1546767105000,682393.6,2457.6,110.4,0.4
+1546767110000,172032.0,0.0,33.4,0.0
+1546767105000,4467916.8,9968025.6,469.6,527.4
+1546767115000,2663219.2,23633100.8,346.4,533.0
+1546767120000,7322828.8,8749056.0,704.6,89.4
+1546767125000,11634278.4,16227532.8,1114.6,660.8
+1546767130000,9075916.8,2292121.6,1080.4,17.8
+1546767135000,6104678.4,6104678.4,713.4,548.6
+1546767140000,3059712.0,5269913.6,411.6,117.4
+1546767145000,1742438.4,44236.8,269.6,4.8
+1546767150000,1912832.0,129433.6,258.8,25.2
+1546767155000,5937561.6,639795.2,664.4,89.8
+1546767160000,5163417.6,285081.6,527.8,16.6
+1546767165000,5855641.6,550502.4,402.0,84.0
+1546767170000,8157593.6,362905.6,544.0,31.8
+1546767175000,3635609.6,43417.6,345.8,0.8
+1546767180000,3884646.4,132710.4,359.0,10.6
+1546767185000,2644377.6,159744.0,328.2,5.6
+1546767190000,2102067.2,42598.4,175.6,0.8
+1546767195000,2306048.0,45875.2,246.2,1.0
+1546767200000,3108864.0,58982.4,386.4,2.4
+1546767205000,8101068.8,835584.0,642.8,53.6
+1546767210000,15243673.6,828211.2,975.6,36.6
+1546767215000,6000640.0,96665.6,368.4,0.8
+1546767220000,4905369.6,32768.0,409.8,0.8
+1546767225000,14250803.2,2218393.6,685.0,28.8
+1546767230000,3560243.2,57344.0,359.8,1.2
+1546767235000,3239936.0,82739.2,449.8,0.8
+1546767240000,6520832.0,36864.0,514.2,1.4
+1546767245000,810188.8,188416.0,115.2,8.2
+1546767250000,442368.0,139264.0,88.0,1.4
+1546767255000,1186201.6,208896.0,137.0,3.2
+1546767260000,90931.2,199884.8,14.6,15.0
+1546767265000,933888.0,67993.6,74.2,2.0
+1546767270000,533299.2,122060.8,43.6,4.0
+1546767275000,684032.0,176128.0,87.6,4.8
+1546767280000,426803.2,258048.0,65.8,11.8
+1546767285000,39321.6,151552.0,8.4,3.0
+1546767290000,1332019.2,180224.0,212.6,3.0
+1546767295000,1295155.2,130252.8,162.6,12.2
+1546767300000,1449164.8,81920.0,250.0,2.4
+1546767305000,1516339.2,131072.0,108.4,3.6
+1546767310000,968294.4,163840.0,127.2,5.6
+1546767315000,2228224.0,252313.6,307.0,18.8
+1546767320000,1554022.4,55705.6,249.6,2.2
+1546767325000,1043660.8,389120.0,156.4,2.6
+1546767330000,186777.6,226918.4,6.0,23.4
+1546767335000,8181350.4,18864537.6,589.2,880.0
+1546767340000,12487065.6,2679603.2,895.6,150.6
+1546767345000,10952704.0,903577.6,816.0,77.0
+1546767340000,3143270.4,25080627.2,249.8,671.0
+1546767345000,4446617.6,45875.2,379.4,0.4
+1546767350000,4508876.8,33600307.2,314.6,733.2
+1546767355000,3375104.0,17011507.2,472.0,220.6
+1546767360000,10913382.4,15225651.2,1204.8,789.4
+1546767365000,9657548.8,20618444.8,1510.8,1168.8
+1546767370000,8146124.8,16991027.2,1142.2,1139.4
+1546767375000,7571865.6,7866777.6,767.2,458.2
+1546767380000,5891686.4,5164236.8,615.8,518.6
+1546767385000,1237811.2,1026457.6,143.0,40.0
+1546767390000,6848512.0,6316032.0,722.6,704.6
+1546767395000,13220249.6,7100006.4,1214.4,629.4
+1546767400000,10042572.8,6070272.0,1055.2,624.4
+1546767405000,11848908.8,6144819.2,1164.0,819.2
+1546767410000,9635430.4,488243.2,1150.2,77.6
+1546767415000,5313331.2,267059.2,616.6,38.8
+1546767420000,4938956.8,1775206.4,492.0,31.6
+1546767425000,3100672.0,502988.8,324.0,49.6
+1546767430000,8930918.4,86835.2,542.6,3.2
+1546767435000,2427289.6,173670.4,237.8,3.6
+1546767440000,1952153.6,222822.4,216.0,22.6
+1546767445000,1780121.6,23756.8,172.4,1.6
+1546767450000,2261811.2,41779.2,226.4,3.0
+1546767455000,1975091.2,52428.8,265.4,1.6
+1546767460000,6167756.8,8044544.0,411.8,495.2
+1546767465000,3496345.6,2768896.0,424.6,43.4
+1546767470000,16470835.2,86835.2,1340.0,6.4
+1546767475000,3444736.0,72908.8,215.6,0.8
+1546767480000,4831641.6,40140.8,326.8,0.8
+1546767485000,3313664.0,22118.4,291.6,0.8
+1546767490000,1931673.6,362905.6,231.0,19.0
+1546767495000,1119846.4,114688.0,133.2,2.2
+1546767500000,2830336.0,75366.4,324.0,1.0
+1546767505000,884736.0,217088.0,81.4,8.4
+1546767510000,38502.4,72089.6,4.0,0.8
+1546767515000,156467.2,38502.4,18.6,0.8
+1546767520000,257228.8,62259.2,33.8,1.8
+1546767525000,658636.8,266240.0,109.6,16.8
+1546767530000,575897.6,214630.4,97.8,5.8
+1546767535000,1260748.8,212992.0,173.2,4.4
+1546767540000,271974.4,188416.0,50.0,12.6
+1546767545000,403865.6,126156.8,73.8,2.2
+1546767550000,1239449.6,111411.2,178.4,2.6</pre>
+    <pre id="csv_memory_heatmap" style="display: none">x,y,value,hostname
+1546766860000,0,747656000,hadoop2
+1546766860000,1,725732000,hadoop3
+1546766865000,0,748180000,hadoop2
+1546766865000,1,798012000,hadoop3
+1546766870000,0,748244000,hadoop2
+1546766870000,1,903772000,hadoop3
+1546766875000,0,982796000,hadoop2
+1546766875000,1,1083524000,hadoop3
+1546766880000,0,1101868000,hadoop2
+1546766880000,1,1193808000,hadoop3
+1546766885000,0,1173160000,hadoop2
+1546766885000,1,1242512000,hadoop3
+1546766890000,0,1237312000,hadoop2
+1546766890000,1,1304380000,hadoop3
+1546766895000,0,1299004000,hadoop2
+1546766900000,1,1448128000,hadoop3
+1546766905000,0,1451332000,hadoop2
+1546766905000,1,1451040000,hadoop3
+1546766910000,1,1450796000,hadoop3
+1546766915000,0,1451104000,hadoop2
+1546766915000,1,1449832000,hadoop3
+1546766920000,0,1450908000,hadoop2
+1546766920000,1,1449664000,hadoop3
+1546766925000,0,1451400000,hadoop2
+1546766925000,1,1448880000,hadoop3
+1546766930000,0,1450180000,hadoop2
+1546766930000,1,1450660000,hadoop3
+1546766935000,0,1448428000,hadoop2
+1546766935000,1,1440728000,hadoop3
+1546766940000,0,1436552000,hadoop2
+1546766940000,1,1445240000,hadoop3
+1546766945000,0,1450856000,hadoop2
+1546766945000,1,1446108000,hadoop3
+1546766950000,0,1451332000,hadoop2
+1546766950000,1,1451192000,hadoop3
+1546766955000,0,1451332000,hadoop2
+1546766955000,1,1435404000,hadoop3
+1546766960000,0,1451376000,hadoop2
+1546766960000,1,1443324000,hadoop3
+1546766965000,0,1432276000,hadoop2
+1546766965000,1,1447044000,hadoop3
+1546766970000,0,1443384000,hadoop2
+1546766970000,1,1448704000,hadoop3
+1546766975000,0,1446932000,hadoop2
+1546766975000,1,1437908000,hadoop3
+1546766980000,0,1444852000,hadoop2
+1546766980000,1,1438180000,hadoop3
+1546766985000,0,1414000000,hadoop2
+1546766985000,1,1441296000,hadoop3
+1546766990000,0,1449156000,hadoop2
+1546766990000,1,999000000,hadoop3
+1546766995000,0,1425032000,hadoop2
+1546766995000,1,999868000,hadoop3
+1546767000000,0,1435756000,hadoop2
+1546767000000,1,1003144000,hadoop3
+1546767005000,0,1430788000,hadoop2
+1546767005000,1,1010828000,hadoop3
+1546767010000,0,474088000,hadoop2
+1546767010000,1,594684000,hadoop3
+1546767015000,0,479760000,hadoop2
+1546767015000,1,600440000,hadoop3
+1546767020000,0,485092000,hadoop2
+1546767020000,1,600976000,hadoop3
+1546767025000,0,489804000,hadoop2
+1546767025000,1,610152000,hadoop3
+1546767030000,0,492656000,hadoop2
+1546767030000,1,614548000,hadoop3
+1546767035000,0,496004000,hadoop2
+1546767035000,1,616508000,hadoop3
+1546767040000,0,499600000,hadoop2
+1546767040000,1,622616000,hadoop3
+1546767045000,0,504220000,hadoop2
+1546767045000,1,629312000,hadoop3
+1546767050000,0,507568000,hadoop2
+1546767050000,1,641376000,hadoop3
+1546767055000,0,515752000,hadoop2
+1546767055000,1,680092000,hadoop3
+1546767060000,0,519228000,hadoop2
+1546767060000,1,731000000,hadoop3
+1546767065000,0,522204000,hadoop2
+1546767065000,1,771404000,hadoop3
+1546767070000,0,526048000,hadoop2
+1546767070000,1,855756000,hadoop3
+1546767075000,0,529396000,hadoop2
+1546767075000,1,936604000,hadoop3
+1546767080000,0,533488000,hadoop2
+1546767080000,1,983524000,hadoop3
+1546767085000,0,536216000,hadoop2
+1546767085000,1,1008592000,hadoop3
+1546767090000,0,538448000,hadoop2
+1546767090000,1,1049004000,hadoop3
+1546767095000,0,540680000,hadoop2
+1546767095000,1,1085252000,hadoop3
+1546767100000,0,543656000,hadoop2
+1546767100000,1,1131180000,hadoop3
+1546767105000,0,547004000,hadoop2
+1546767110000,0,547872000,hadoop2
+1546767105000,1,1450824000,hadoop3
+1546767115000,0,548988000,hadoop2
+1546767115000,1,1451424000,hadoop3
+1546767120000,0,549608000,hadoop2
+1546767120000,1,1443008000,hadoop3
+1546767125000,0,550104000,hadoop2
+1546767125000,1,1421816000,hadoop3
+1546767130000,0,550848000,hadoop2
+1546767130000,1,1451140000,hadoop3
+1546767135000,0,551840000,hadoop2
+1546767135000,1,1450384000,hadoop3
+1546767140000,0,552832000,hadoop2
+1546767140000,1,1434984000,hadoop3
+1546767145000,0,554320000,hadoop2
+1546767145000,1,1442036000,hadoop3
+1546767150000,0,557296000,hadoop2
+1546767150000,1,1444128000,hadoop3
+1546767155000,0,593216000,hadoop2
+1546767155000,1,855256000,hadoop3
+1546767160000,0,675212000,hadoop2
+1546767160000,1,870196000,hadoop3
+1546767165000,0,738680000,hadoop2
+1546767165000,1,588780000,hadoop3
+1546767170000,0,852908000,hadoop2
+1546767170000,1,766136000,hadoop3
+1546767175000,0,926412000,hadoop2
+1546767175000,1,908488000,hadoop3
+1546767180000,0,1008216000,hadoop2
+1546767180000,1,954044000,hadoop3
+1546767185000,0,1053332000,hadoop2
+1546767185000,1,994672000,hadoop3
+1546767190000,0,1101844000,hadoop2
+1546767190000,1,1055536000,hadoop3
+1546767195000,0,1176812000,hadoop2
+1546767195000,1,1187812000,hadoop3
+1546767200000,0,1318648000,hadoop2
+1546767200000,1,1199100000,hadoop3
+1546767205000,0,915768000,hadoop2
+1546767205000,1,1263552000,hadoop3
+1546767210000,0,1038616000,hadoop2
+1546767210000,1,820576000,hadoop3
+1546767215000,0,1130692000,hadoop2
+1546767215000,1,977468000,hadoop3
+1546767220000,0,1192120000,hadoop2
+1546767220000,1,1047392000,hadoop3
+1546767225000,0,1030260000,hadoop2
+1546767225000,1,1098480000,hadoop3
+1546767230000,0,1139960000,hadoop2
+1546767230000,1,922984000,hadoop3
+1546767235000,0,1196136000,hadoop2
+1546767235000,1,1052516000,hadoop3
+1546767240000,0,1245316000,hadoop2
+1546767240000,1,880540000,hadoop3
+1546767245000,0,770484000,hadoop2
+1546767245000,1,1008936000,hadoop3
+1546767250000,0,946280000,hadoop2
+1546767250000,1,1016112000,hadoop3
+1546767255000,0,1039312000,hadoop2
+1546767255000,1,963272000,hadoop3
+1546767260000,0,1100944000,hadoop2
+1546767260000,1,1058056000,hadoop3
+1546767265000,0,1161284000,hadoop2
+1546767265000,1,1115148000,hadoop3
+1546767270000,0,1202316000,hadoop2
+1546767270000,1,960524000,hadoop3
+1546767275000,0,1015840000,hadoop2
+1546767275000,1,1050468000,hadoop3
+1546767280000,0,699584000,hadoop2
+1546767280000,1,960420000,hadoop3
+1546767285000,0,633624000,hadoop2
+1546767285000,1,935388000,hadoop3
+1546767290000,0,632516000,hadoop2
+1546767290000,1,721840000,hadoop3
+1546767295000,0,634112000,hadoop2
+1546767295000,1,721900000,hadoop3
+1546767300000,0,634684000,hadoop2
+1546767300000,1,684580000,hadoop3
+1546767305000,0,634684000,hadoop2
+1546767305000,1,782896000,hadoop3
+1546767310000,0,638988000,hadoop2
+1546767310000,1,969764000,hadoop3
+1546767315000,0,872356000,hadoop2
+1546767315000,1,1086596000,hadoop3
+1546767320000,0,997752000,hadoop2
+1546767320000,1,1155232000,hadoop3
+1546767325000,0,1071524000,hadoop2
+1546767325000,1,1208828000,hadoop3
+1546767330000,0,1139344000,hadoop2
+1546767330000,1,1451380000,hadoop3
+1546767335000,0,1197340000,hadoop2
+1546767335000,1,929308000,hadoop3
+1546767340000,1,702416000,hadoop3
+1546767345000,1,733044000,hadoop3
+1546767340000,0,1450588000,hadoop2
+1546767345000,1,841300000,hadoop3
+1546767350000,0,1444236000,hadoop2
+1546767350000,1,988240000,hadoop3
+1546767355000,0,1447672000,hadoop2
+1546767355000,1,1160632000,hadoop3
+1546767360000,0,1450716000,hadoop2
+1546767360000,1,1064672000,hadoop3
+1546767365000,0,1444448000,hadoop2
+1546767365000,1,1436504000,hadoop3
+1546767370000,0,1448208000,hadoop2
+1546767370000,1,1451064000,hadoop3
+1546767375000,0,1444968000,hadoop2
+1546767375000,1,1437796000,hadoop3
+1546767380000,0,1447248000,hadoop2
+1546767380000,1,730476000,hadoop3
+1546767385000,0,1449140000,hadoop2
+1546767385000,1,731140000,hadoop3
+1546767390000,0,1444200000,hadoop2
+1546767390000,1,733992000,hadoop3
+1546767395000,0,1442400000,hadoop2
+1546767395000,1,836900000,hadoop3
+1546767400000,0,1450844000,hadoop2
+1546767400000,1,977952000,hadoop3
+1546767405000,0,1338716000,hadoop2
+1546767405000,1,1043128000,hadoop3
+1546767410000,0,1102228000,hadoop2
+1546767410000,1,1079332000,hadoop3
+1546767415000,0,822688000,hadoop2
+1546767415000,1,1024980000,hadoop3
+1546767420000,0,533816000,hadoop2
+1546767420000,1,1206588000,hadoop3
+1546767425000,0,536908000,hadoop2
+1546767425000,1,1048172000,hadoop3
+1546767430000,0,714296000,hadoop2
+1546767430000,1,1112476000,hadoop3
+1546767435000,0,855440000,hadoop2
+1546767435000,1,1118088000,hadoop3
+1546767440000,0,899112000,hadoop2
+1546767440000,1,1119824000,hadoop3
+1546767445000,0,941304000,hadoop2
+1546767445000,1,1120196000,hadoop3
+1546767450000,0,1004916000,hadoop2
+1546767450000,1,1120568000,hadoop3
+1546767455000,0,1061068000,hadoop2
+1546767455000,1,1133652000,hadoop3
+1546767460000,0,1443420000,hadoop2
+1546767460000,1,1145896000,hadoop3
+1546767465000,0,588324000,hadoop2
+1546767465000,1,1131636000,hadoop3
+1546767470000,0,751980000,hadoop2
+1546767470000,1,1158420000,hadoop3
+1546767475000,0,953564000,hadoop2
+1546767475000,1,1158948000,hadoop3
+1546767480000,0,1072764000,hadoop2
+1546767480000,1,1159568000,hadoop3
+1546767485000,0,1146112000,hadoop2
+1546767485000,1,1160096000,hadoop3
+1546767490000,0,1060228000,hadoop2
+1546767490000,1,1160872000,hadoop3
+1546767495000,0,1024524000,hadoop2
+1546767495000,1,1174388000,hadoop3
+1546767500000,0,948980000,hadoop2
+1546767500000,1,764936000,hadoop3
+1546767505000,0,953316000,hadoop2
+1546767505000,1,944532000,hadoop3
+1546767510000,0,1040240000,hadoop2
+1546767510000,1,1043672000,hadoop3
+1546767515000,0,1120808000,hadoop2
+1546767515000,1,1099076000,hadoop3
+1546767520000,0,1175724000,hadoop2
+1546767520000,1,1083664000,hadoop3
+1546767525000,0,1217484000,hadoop2
+1546767525000,1,1079112000,hadoop3
+1546767530000,0,1014036000,hadoop2
+1546767530000,1,884560000,hadoop3
+1546767535000,0,1023492000,hadoop2
+1546767535000,1,964540000,hadoop3
+1546767540000,0,878352000,hadoop2
+1546767540000,1,1023088000,hadoop3
+1546767545000,0,935400000,hadoop2
+1546767545000,1,735560000,hadoop3
+1546767550000,0,650200000,hadoop2
+1546767550000,1,739440000,hadoop3</pre>
+    <pre id="csv_memory_overall" style="display: none">x,free,buffer_cache,used
+1546766860000,1530516,245868,1227520
+1546766865000,1457712,248568,1297624
+1546766870000,1351888,254628,1397388
+1546766875000,937584,255668,1810652
+1546766880000,708228,255752,2039924
+1546766885000,588232,255736,2159936
+1546766890000,462212,256344,2285348
+1546766895000,202948,115316,1183688
+1546766900000,53824,21344,1426784
+1546766905000,101532,38600,2863772
+1546766910000,51156,22036,1428760
+1546766915000,102968,39396,2861540
+1546766920000,103332,40420,2860152
+1546766925000,103624,42876,2857404
+1546766930000,103064,49088,2851752
+1546766935000,114748,47608,2841548
+1546766940000,122112,53864,2827928
+1546766945000,106940,57492,2839472
+1546766950000,101380,59524,2843000
+1546766955000,117168,59472,2827264
+1546766960000,109204,67904,2826796
+1546766965000,124584,69180,2810140
+1546766970000,111816,72072,2820016
+1546766975000,119064,69012,2815828
+1546766980000,120872,68132,2814900
+1546766985000,148608,66616,2788680
+1546766990000,555748,68832,2379324
+1546766995000,579004,67964,2356936
+1546767000000,565004,71212,2367688
+1546767005000,562288,75408,2366208
+1546767010000,1935132,81388,987384
+1546767015000,1923704,83004,997196
+1546767020000,1917836,84492,1001576
+1546767025000,1903948,89056,1010900
+1546767030000,1896700,90444,1016760
+1546767035000,1891392,91308,1021204
+1546767040000,1881688,91584,1030632
+1546767045000,1870372,91732,1041800
+1546767050000,1854960,93228,1055716
+1546767055000,1808060,104336,1091508
+1546767060000,1753676,110860,1139368
+1546767065000,1710296,118460,1175148
+1546767070000,1622100,123476,1258328
+1546767075000,1537904,126900,1339100
+1546767080000,1486892,130824,1386188
+1546767085000,1459096,134452,1410356
+1546767090000,1416452,138856,1448596
+1546767095000,1377972,142764,1483168
+1546767100000,1329068,145728,1529108
+1546767105000,954948,35348,511656
+1546767110000,954080,35368,512504
+1546767105000,51128,20272,1430552
+1546767115000,1003492,51668,1948744
+1546767120000,1011288,57440,1935176
+1546767125000,1031984,62384,1909536
+1546767130000,1001916,64104,1937884
+1546767135000,1001680,66300,1935924
+1546767140000,1016088,65596,1922220
+1546767145000,1007548,66368,1929988
+1546767150000,1002480,66416,1935008
+1546767155000,1555432,78572,1369900
+1546767160000,1458496,90432,1454976
+1546767165000,1676444,110400,1217060
+1546767170000,1384860,142648,1476396
+1546767175000,1169004,154684,1680216
+1546767180000,1041644,164856,1797404
+1546767185000,955900,171508,1876496
+1546767190000,846524,181420,1975960
+1546767195000,639280,190088,2174536
+1546767200000,486156,195676,2322072
+1546767205000,824584,61612,2117708
+1546767210000,1144712,120088,1739104
+1546767215000,895744,144776,1963384
+1546767220000,764392,166660,2072852
+1546767225000,875164,165164,1963576
+1546767230000,940960,178832,1884112
+1546767235000,755252,186200,2062452
+1546767240000,878048,204512,1921344
+1546767245000,1224484,205132,1574288
+1546767250000,1041512,205544,1756848
+1546767255000,1001320,205568,1797016
+1546767260000,844904,206116,1952884
+1546767265000,727472,207332,2069100
+1546767270000,841064,209056,1953784
+1546767275000,937596,209072,1857236
+1546767280000,1343900,208412,1451592
+1546767285000,1434892,208728,1360284
+1546767290000,1649548,209908,1144448
+1546767295000,1647892,211200,1144812
+1546767300000,1684640,211908,1107356
+1546767305000,1586324,218280,1199300
+1546767310000,1395152,219848,1388904
+1546767315000,1044952,220340,1738612
+1546767320000,850920,220408,1932576
+1546767325000,723552,221168,2059184
+1546767330000,413180,198204,2392520
+1546767335000,877256,143896,1982752
+1546767340000,799536,71132,631284
+1546767345000,768908,77180,655864
+1546767340000,51364,17980,1432608
+1546767345000,660652,87952,753348
+1546767350000,571428,111024,2321452
+1546767355000,395600,115228,2493076
+1546767360000,488516,130660,2384728
+1546767365000,122952,123592,2757360
+1546767370000,104632,53252,2846020
+1546767375000,121140,52028,2830736
+1546767380000,826180,56920,2120804
+1546767385000,823624,59272,2121008
+1546767390000,825712,64812,2113380
+1546767395000,724604,90436,2188864
+1546767400000,575108,101452,2327344
+1546767405000,622060,113864,2267980
+1546767410000,822344,117668,2063892
+1546767415000,1156236,120236,1727432
+1546767420000,1263500,129264,1611140
+1546767425000,1418824,136240,1448840
+1546767430000,1177132,167556,1659216
+1546767435000,1030376,172984,1800544
+1546767440000,984968,177684,1841252
+1546767445000,942404,183208,1878292
+1546767450000,878420,189148,1936336
+1546767455000,809184,193552,2001168
+1546767460000,414588,118896,2470420
+1546767465000,1283944,123804,1596156
+1546767470000,1093504,160132,1750268
+1546767475000,891392,175996,1936516
+1546767480000,771572,193124,2039208
+1546767485000,697696,196632,2109576
+1546767490000,782804,198656,2022444
+1546767495000,804992,200728,1998184
+1546767500000,1289988,204692,1509224
+1546767505000,1106056,205792,1692056
+1546767510000,919992,205936,1877976
+1546767515000,784020,206528,2013356
+1546767520000,744516,206888,2052500
+1546767525000,707308,207684,2088912
+1546767530000,1105308,207292,1691304
+1546767535000,1015872,207512,1780520
+1546767540000,1102464,207384,1694056
+1546767545000,1332944,207472,1463488
+1546767550000,1614264,208852,1180788</pre>
+    <pre id="csv_procload_heatmap" style="display: none">x,y,value,hostname
+1546766860000,0,540,hadoop2
+1546766860000,1,539,hadoop3
+1546766865000,0,540,hadoop2
+1546766865000,1,559,hadoop3
+1546766870000,0,540,hadoop2
+1546766870000,1,666,hadoop3
+1546766875000,0,646,hadoop2
+1546766875000,1,697,hadoop3
+1546766880000,0,646,hadoop2
+1546766880000,1,701,hadoop3
+1546766885000,0,646,hadoop2
+1546766885000,1,717,hadoop3
+1546766890000,0,669,hadoop2
+1546766890000,1,746,hadoop3
+1546766895000,0,677,hadoop2
+1546766900000,1,752,hadoop3
+1546766905000,0,701,hadoop2
+1546766905000,1,742,hadoop3
+1546766910000,1,745,hadoop3
+1546766915000,0,696,hadoop2
+1546766915000,1,745,hadoop3
+1546766920000,0,697,hadoop2
+1546766920000,1,746,hadoop3
+1546766925000,0,697,hadoop2
+1546766925000,1,750,hadoop3
+1546766930000,0,697,hadoop2
+1546766930000,1,750,hadoop3
+1546766935000,0,696,hadoop2
+1546766935000,1,748,hadoop3
+1546766940000,0,695,hadoop2
+1546766940000,1,743,hadoop3
+1546766945000,0,700,hadoop2
+1546766945000,1,738,hadoop3
+1546766950000,0,700,hadoop2
+1546766950000,1,733,hadoop3
+1546766955000,0,704,hadoop2
+1546766955000,1,728,hadoop3
+1546766960000,0,706,hadoop2
+1546766960000,1,726,hadoop3
+1546766965000,0,702,hadoop2
+1546766965000,1,723,hadoop3
+1546766970000,0,701,hadoop2
+1546766970000,1,724,hadoop3
+1546766975000,0,698,hadoop2
+1546766975000,1,726,hadoop3
+1546766980000,0,698,hadoop2
+1546766980000,1,727,hadoop3
+1546766985000,0,696,hadoop2
+1546766985000,1,710,hadoop3
+1546766990000,0,692,hadoop2
+1546766990000,1,674,hadoop3
+1546766995000,0,693,hadoop2
+1546766995000,1,674,hadoop3
+1546767000000,0,699,hadoop2
+1546767000000,1,675,hadoop3
+1546767005000,0,666,hadoop2
+1546767005000,1,665,hadoop3
+1546767010000,0,540,hadoop2
+1546767010000,1,623,hadoop3
+1546767015000,0,540,hadoop2
+1546767015000,1,621,hadoop3
+1546767020000,0,541,hadoop2
+1546767020000,1,623,hadoop3
+1546767025000,0,539,hadoop2
+1546767025000,1,626,hadoop3
+1546767030000,0,539,hadoop2
+1546767030000,1,625,hadoop3
+1546767035000,0,539,hadoop2
+1546767035000,1,623,hadoop3
+1546767040000,0,538,hadoop2
+1546767040000,1,623,hadoop3
+1546767045000,0,538,hadoop2
+1546767045000,1,624,hadoop3
+1546767050000,0,539,hadoop2
+1546767050000,1,635,hadoop3
+1546767055000,0,540,hadoop2
+1546767055000,1,667,hadoop3
+1546767060000,0,540,hadoop2
+1546767060000,1,696,hadoop3
+1546767065000,0,540,hadoop2
+1546767065000,1,696,hadoop3
+1546767070000,0,540,hadoop2
+1546767070000,1,695,hadoop3
+1546767075000,0,540,hadoop2
+1546767075000,1,696,hadoop3
+1546767080000,0,540,hadoop2
+1546767080000,1,696,hadoop3
+1546767085000,0,540,hadoop2
+1546767085000,1,708,hadoop3
+1546767090000,0,540,hadoop2
+1546767090000,1,720,hadoop3
+1546767095000,0,540,hadoop2
+1546767095000,1,726,hadoop3
+1546767100000,0,540,hadoop2
+1546767100000,1,736,hadoop3
+1546767105000,0,540,hadoop2
+1546767110000,0,540,hadoop2
+1546767105000,1,752,hadoop3
+1546767115000,0,540,hadoop2
+1546767115000,1,746,hadoop3
+1546767120000,0,540,hadoop2
+1546767120000,1,745,hadoop3
+1546767125000,0,540,hadoop2
+1546767125000,1,747,hadoop3
+1546767130000,0,540,hadoop2
+1546767130000,1,755,hadoop3
+1546767135000,0,540,hadoop2
+1546767135000,1,752,hadoop3
+1546767140000,0,540,hadoop2
+1546767140000,1,728,hadoop3
+1546767145000,0,540,hadoop2
+1546767145000,1,729,hadoop3
+1546767150000,0,540,hadoop2
+1546767150000,1,728,hadoop3
+1546767155000,0,572,hadoop2
+1546767155000,1,667,hadoop3
+1546767160000,0,636,hadoop2
+1546767160000,1,652,hadoop3
+1546767165000,0,636,hadoop2
+1546767165000,1,640,hadoop3
+1546767170000,0,636,hadoop2
+1546767170000,1,684,hadoop3
+1546767175000,0,636,hadoop2
+1546767175000,1,700,hadoop3
+1546767180000,0,636,hadoop2
+1546767180000,1,705,hadoop3
+1546767185000,0,652,hadoop2
+1546767185000,1,719,hadoop3
+1546767190000,0,668,hadoop2
+1546767190000,1,725,hadoop3
+1546767195000,0,677,hadoop2
+1546767195000,1,766,hadoop3
+1546767200000,0,746,hadoop2
+1546767200000,1,766,hadoop3
+1546767205000,0,684,hadoop2
+1546767205000,1,753,hadoop3
+1546767210000,0,718,hadoop2
+1546767210000,1,717,hadoop3
+1546767215000,0,724,hadoop2
+1546767215000,1,729,hadoop3
+1546767220000,0,742,hadoop2
+1546767220000,1,744,hadoop3
+1546767225000,0,706,hadoop2
+1546767225000,1,761,hadoop3
+1546767230000,0,684,hadoop2
+1546767230000,1,712,hadoop3
+1546767235000,0,715,hadoop2
+1546767235000,1,746,hadoop3
+1546767240000,0,724,hadoop2
+1546767240000,1,676,hadoop3
+1546767245000,0,602,hadoop2
+1546767245000,1,723,hadoop3
+1546767250000,0,640,hadoop2
+1546767250000,1,721,hadoop3
+1546767255000,0,644,hadoop2
+1546767255000,1,700,hadoop3
+1546767260000,0,659,hadoop2
+1546767260000,1,719,hadoop3
+1546767265000,0,679,hadoop2
+1546767265000,1,740,hadoop3
+1546767270000,0,708,hadoop2
+1546767270000,1,723,hadoop3
+1546767275000,0,670,hadoop2
+1546767275000,1,730,hadoop3
+1546767280000,0,557,hadoop2
+1546767280000,1,689,hadoop3
+1546767285000,0,541,hadoop2
+1546767285000,1,694,hadoop3
+1546767290000,0,538,hadoop2
+1546767290000,1,611,hadoop3
+1546767295000,0,538,hadoop2
+1546767295000,1,571,hadoop3
+1546767300000,0,539,hadoop2
+1546767300000,1,554,hadoop3
+1546767305000,0,539,hadoop2
+1546767305000,1,616,hadoop3
+1546767310000,0,551,hadoop2
+1546767310000,1,699,hadoop3
+1546767315000,0,644,hadoop2
+1546767315000,1,700,hadoop3
+1546767320000,0,643,hadoop2
+1546767320000,1,710,hadoop3
+1546767325000,0,643,hadoop2
+1546767325000,1,728,hadoop3
+1546767330000,0,669,hadoop2
+1546767330000,1,740,hadoop3
+1546767335000,0,676,hadoop2
+1546767335000,1,674,hadoop3
+1546767340000,1,641,hadoop3
+1546767345000,1,641,hadoop3
+1546767340000,0,717,hadoop2
+1546767345000,1,705,hadoop3
+1546767350000,0,709,hadoop2
+1546767350000,1,705,hadoop3
+1546767355000,0,705,hadoop2
+1546767355000,1,717,hadoop3
+1546767360000,0,703,hadoop2
+1546767360000,1,721,hadoop3
+1546767365000,0,702,hadoop2
+1546767365000,1,754,hadoop3
+1546767370000,0,701,hadoop2
+1546767370000,1,758,hadoop3
+1546767375000,0,702,hadoop2
+1546767375000,1,767,hadoop3
+1546767380000,0,700,hadoop2
+1546767380000,1,678,hadoop3
+1546767385000,0,699,hadoop2
+1546767385000,1,678,hadoop3
+1546767390000,0,700,hadoop2
+1546767390000,1,677,hadoop3
+1546767395000,0,701,hadoop2
+1546767395000,1,725,hadoop3
+1546767400000,0,694,hadoop2
+1546767400000,1,726,hadoop3
+1546767405000,0,675,hadoop2
+1546767405000,1,741,hadoop3
+1546767410000,0,635,hadoop2
+1546767410000,1,774,hadoop3
+1546767415000,0,573,hadoop2
+1546767415000,1,759,hadoop3
+1546767420000,0,541,hadoop2
+1546767420000,1,779,hadoop3
+1546767425000,0,541,hadoop2
+1546767425000,1,760,hadoop3
+1546767430000,0,613,hadoop2
+1546767430000,1,791,hadoop3
+1546767435000,0,613,hadoop2
+1546767435000,1,789,hadoop3
+1546767440000,0,619,hadoop2
+1546767440000,1,787,hadoop3
+1546767445000,0,625,hadoop2
+1546767445000,1,787,hadoop3
+1546767450000,0,643,hadoop2
+1546767450000,1,787,hadoop3
+1546767455000,0,675,hadoop2
+1546767455000,1,787,hadoop3
+1546767460000,0,684,hadoop2
+1546767460000,1,789,hadoop3
+1546767465000,0,575,hadoop2
+1546767465000,1,789,hadoop3
+1546767470000,0,616,hadoop2
+1546767470000,1,787,hadoop3
+1546767475000,0,658,hadoop2
+1546767475000,1,787,hadoop3
+1546767480000,0,668,hadoop2
+1546767480000,1,787,hadoop3
+1546767485000,0,685,hadoop2
+1546767485000,1,785,hadoop3
+1546767490000,0,672,hadoop2
+1546767490000,1,785,hadoop3
+1546767495000,0,697,hadoop2
+1546767495000,1,762,hadoop3
+1546767500000,0,638,hadoop2
+1546767500000,1,643,hadoop3
+1546767505000,0,644,hadoop2
+1546767505000,1,701,hadoop3
+1546767510000,0,655,hadoop2
+1546767510000,1,708,hadoop3
+1546767515000,0,664,hadoop2
+1546767515000,1,723,hadoop3
+1546767520000,0,719,hadoop2
+1546767520000,1,730,hadoop3
+1546767525000,0,706,hadoop2
+1546767525000,1,744,hadoop3
+1546767530000,0,674,hadoop2
+1546767530000,1,674,hadoop3
+1546767535000,0,643,hadoop2
+1546767535000,1,685,hadoop3
+1546767540000,0,604,hadoop2
+1546767540000,1,700,hadoop3
+1546767545000,0,635,hadoop2
+1546767545000,1,624,hadoop3
+1546767550000,0,540,hadoop2
+1546767550000,1,610,hadoop3</pre>
+    <pre id="csv_procload_overall" style="display: none">x,load5,load10,load15,|running,procs
+1546766860000,14.6,17.72,19.25,2,1079
+1546766865000,13.43,17.41,19.15,4,1099
+1546766870000,12.52,17.16,19.05,12,1206
+1546766875000,13.99,17.39,19.11,42,1343
+1546766880000,16.0,17.75,19.22,39,1347
+1546766885000,17.28,17.99,19.29,37,1363
+1546766890000,18.46,18.22,19.36,31,1415
+1546766895000,10.4,8.59,10.18,20,677
+1546766900000,10.03,10.03,9.31,1,752
+1546766905000,23.95,19.48,19.75,23,1443
+1546766910000,10.72,10.17,9.36,3,745
+1546766915000,25.17,19.83,19.87,3,1441
+1546766920000,26.77,20.24,20.0,6,1443
+1546766925000,26.54,20.31,20.02,6,1447
+1546766930000,27.06,20.52,20.09,5,1447
+1546766935000,27.94,20.81,20.19,8,1444
+1546766940000,28.66,21.08,20.28,4,1438
+1546766945000,29.65,21.41,20.39,4,1438
+1546766950000,30.0,21.62,20.46,8,1433
+1546766955000,30.48,21.86,20.55,5,1432
+1546766960000,30.53,22.01,20.6,6,1432
+1546766965000,31.04,22.26,20.69,4,1425
+1546766970000,30.07,22.21,20.68,5,1425
+1546766975000,28.95,22.1,20.66,5,1424
+1546766980000,29.04,22.23,20.7,7,1425
+1546766985000,30.31,22.61,20.83,5,1406
+1546766990000,28.77,22.41,20.78,7,1366
+1546766995000,27.1,22.18,20.71,4,1367
+1546767000000,25.49,21.92,20.64,4,1374
+1546767005000,24.17,21.71,20.58,9,1331
+1546767010000,23.44,21.6,20.54,7,1163
+1546767015000,22.6,21.45,20.5,4,1161
+1546767020000,21.67,21.28,20.45,3,1164
+1546767025000,20.82,21.11,20.4,5,1165
+1546767030000,19.54,20.84,20.32,3,1164
+1546767035000,18.46,20.6,20.24,3,1162
+1546767040000,17.78,20.42,20.18,4,1161
+1546767045000,17.48,20.31,20.15,8,1162
+1546767050000,16.81,20.13,20.09,12,1174
+1546767055000,17.14,20.14,20.1,9,1207
+1546767060000,16.57,19.97,20.05,5,1236
+1546767065000,15.8,19.76,19.97,6,1236
+1546767070000,15.65,19.66,19.94,2,1235
+1546767075000,14.96,19.45,19.87,14,1236
+1546767080000,14.48,19.28,19.81,12,1236
+1546767085000,14.52,19.21,19.79,13,1248
+1546767090000,13.92,19.0,19.72,19,1260
+1546767095000,13.6,18.85,19.66,3,1266
+1546767100000,13.16,18.67,19.6,13,1276
+1546767105000,4.29,8.81,10.18,3,540
+1546767110000,4.03,8.68,10.13,2,540
+1546767105000,10.13,10.01,9.47,1,752
+1546767115000,14.63,18.71,19.6,2,1286
+1546767120000,15.3,18.78,19.62,3,1285
+1546767125000,15.84,18.83,19.63,6,1287
+1546767130000,15.85,18.79,19.61,2,1295
+1546767135000,15.71,18.71,19.58,3,1292
+1546767140000,16.13,18.74,19.59,2,1268
+1546767145000,16.68,18.82,19.61,5,1269
+1546767150000,16.54,18.7,19.56,4,1268
+1546767155000,18.61,19.15,19.71,5,1239
+1546767160000,20.48,19.53,19.83,2,1288
+1546767165000,20.13,19.47,19.81,12,1276
+1546767170000,21.31,19.74,19.88,17,1320
+1546767175000,22.41,19.99,19.97,38,1336
+1546767180000,22.7,20.02,19.97,15,1341
+1546767185000,22.32,19.98,19.96,15,1371
+1546767190000,23.09,20.18,20.03,30,1393
+1546767195000,23.8,20.38,20.09,20,1443
+1546767200000,23.58,20.39,20.1,7,1512
+1546767205000,23.29,20.38,20.09,20,1437
+1546767210000,22.46,20.25,20.06,12,1435
+1546767215000,21.55,20.1,20.01,18,1453
+1546767220000,21.03,20.02,19.98,16,1486
+1546767225000,20.3,19.89,19.93,14,1467
+1546767230000,19.56,19.73,19.89,24,1396
+1546767235000,19.92,19.81,19.91,15,1461
+1546767240000,20.32,19.9,19.94,27,1400
+1546767245000,19.97,19.83,19.92,30,1325
+1546767250000,21.26,20.1,20.01,36,1361
+1546767255000,22.28,20.33,20.08,35,1344
+1546767260000,22.98,20.51,20.14,37,1378
+1546767265000,23.86,20.73,20.21,40,1419
+1546767270000,25.16,21.05,20.32,37,1431
+1546767275000,25.46,21.18,20.36,37,1400
+1546767280000,24.86,21.13,20.35,17,1246
+1546767285000,23.43,20.89,20.28,11,1235
+1546767290000,22.19,20.68,20.21,2,1149
+1546767295000,20.66,20.39,20.12,4,1109
+1546767300000,19.01,20.05,20.02,6,1093
+1546767305000,17.65,19.75,19.91,4,1155
+1546767310000,16.39,19.46,19.81,20,1250
+1546767315000,17.48,19.63,19.88,40,1344
+1546767320000,19.04,19.92,19.96,38,1353
+1546767325000,20.4,20.19,20.05,31,1371
+1546767330000,21.17,20.35,20.11,30,1409
+1546767335000,21.48,20.42,20.14,23,1350
+1546767340000,10.17,10.98,10.08,4,641
+1546767345000,9.84,10.9,10.06,1,641
+1546767340000,13.7,10.0,10.23,27,717
+1546767345000,9.84,10.9,10.06,14,705
+1546767350000,24.38,21.11,20.36,19,1414
+1546767355000,25.71,21.44,20.47,2,1422
+1546767360000,26.46,21.67,20.55,18,1424
+1546767365000,27.7,22.01,20.67,9,1456
+1546767370000,28.44,22.25,20.75,3,1459
+1546767375000,30.65,22.81,20.94,3,1469
+1546767380000,30.92,23.0,21.02,3,1378
+1546767385000,31.17,23.18,21.09,4,1377
+1546767390000,30.84,23.25,21.11,4,1377
+1546767395000,30.29,23.26,21.14,12,1426
+1546767400000,30.1,23.34,21.17,13,1420
+1546767405000,30.33,23.5,21.23,12,1416
+1546767410000,29.9,23.52,21.26,12,1409
+1546767415000,29.03,23.45,21.24,8,1332
+1546767420000,27.67,23.26,21.19,6,1320
+1546767425000,26.09,23.01,21.12,8,1301
+1546767430000,24.89,22.81,21.06,19,1404
+1546767435000,24.66,22.79,21.07,18,1402
+1546767440000,23.48,22.57,21.01,17,1406
+1546767445000,22.48,22.39,20.96,5,1412
+1546767450000,22.04,22.3,20.94,14,1430
+1546767455000,21.4,22.16,20.89,6,1462
+1546767460000,20.48,21.96,20.84,3,1473
+1546767465000,19.48,21.72,20.77,3,1364
+1546767470000,18.41,21.46,20.69,14,1403
+1546767475000,17.81,21.29,20.64,18,1445
+1546767480000,17.99,21.27,20.64,39,1455
+1546767485000,17.83,21.18,20.61,30,1470
+1546767490000,17.68,21.09,20.58,22,1457
+1546767495000,17.55,21.01,20.55,20,1459
+1546767500000,18.14,21.07,20.58,23,1281
+1546767505000,18.85,21.18,20.62,47,1345
+1546767510000,19.74,21.32,20.66,37,1363
+1546767515000,20.73,21.5,20.72,35,1387
+1546767520000,21.47,21.64,20.78,39,1449
+1546767525000,22.39,21.83,20.85,36,1450
+1546767530000,23.0,21.97,20.89,30,1348
+1546767535000,23.56,22.1,20.94,29,1328
+1546767540000,23.28,22.06,20.94,24,1304
+1546767545000,22.61,21.94,20.9,17,1259
+1546767550000,21.69,21.76,20.85,4,1150</pre>
+    <pre id="csv_events" style="display: none">x,event</pre>
+
+</body>
+</html>
+

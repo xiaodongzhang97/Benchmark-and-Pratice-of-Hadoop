@@ -1,0 +1,41 @@
+MAHOUT_LOCAL is not set; adding HADOOP_CONF_DIR to classpath.
+Running on hadoop, using /home/zhangxiaodong/hadoop-2.4.0/bin/hadoop and HADOOP_CONF_DIR=/home/zhangxiaodong/hadoop-2.4.0/etc/hadoop
+MAHOUT-JOB: /home/zhangxiaodong/HiBench-master/hadoopbench/mahout/target/apache-mahout-distribution-0.11.0/mahout-examples-0.11.0-job.jar
+19/01/06 01:20:14 WARN MahoutDriver: No trainnb.props found on classpath, will use command-line arguments only
+19/01/06 01:20:15 INFO AbstractJob: Command line arguments: {--alphaI=[1.0], --endPhase=[2147483647], --input=[hdfs://hadoop1:9000/HiBench/Bayes/Output/vectors/tfidf-vectors], --labelIndex=[hdfs://hadoop1:9000/HiBench/Bayes/Output/labelindex], --output=[hdfs://hadoop1:9000/HiBench/Bayes/Output/model], --overwrite=null, --startPhase=[0], --tempDir=[hdfs://hadoop1:9000/HiBench/Bayes/Output/temp]}
+19/01/06 01:20:18 INFO deprecation: mapred.input.dir is deprecated. Instead, use mapreduce.input.fileinputformat.inputdir
+19/01/06 01:20:18 INFO deprecation: mapred.compress.map.output is deprecated. Instead, use mapreduce.map.output.compress
+19/01/06 01:20:18 INFO deprecation: mapred.output.dir is deprecated. Instead, use mapreduce.output.fileoutputformat.outputdir
+19/01/06 01:20:18 INFO RMProxy: Connecting to ResourceManager at hadoop1/192.168.40.129:8032
+19/01/06 01:20:22 INFO JobSubmitter: Cleaning up the staging area /tmp/hadoop-yarn/staging/zhangxiaodong/.staging/job_1546761780464_0014
+Exception in thread "main" org.apache.hadoop.mapreduce.lib.input.InvalidInputException: Input path does not exist: hdfs://hadoop1:9000/HiBench/Bayes/Output/vectors/tfidf-vectors
+	at org.apache.hadoop.mapreduce.lib.input.FileInputFormat.singleThreadedListStatus(FileInputFormat.java:320)
+	at org.apache.hadoop.mapreduce.lib.input.FileInputFormat.listStatus(FileInputFormat.java:263)
+	at org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat.listStatus(SequenceFileInputFormat.java:59)
+	at org.apache.hadoop.mapreduce.lib.input.FileInputFormat.getSplits(FileInputFormat.java:375)
+	at org.apache.hadoop.mapreduce.JobSubmitter.writeNewSplits(JobSubmitter.java:493)
+	at org.apache.hadoop.mapreduce.JobSubmitter.writeSplits(JobSubmitter.java:510)
+	at org.apache.hadoop.mapreduce.JobSubmitter.submitJobInternal(JobSubmitter.java:394)
+	at org.apache.hadoop.mapreduce.Job$10.run(Job.java:1285)
+	at org.apache.hadoop.mapreduce.Job$10.run(Job.java:1282)
+	at java.security.AccessController.doPrivileged(Native Method)
+	at javax.security.auth.Subject.doAs(Subject.java:422)
+	at org.apache.hadoop.security.UserGroupInformation.doAs(UserGroupInformation.java:1548)
+	at org.apache.hadoop.mapreduce.Job.submit(Job.java:1282)
+	at org.apache.hadoop.mapreduce.Job.waitForCompletion(Job.java:1303)
+	at org.apache.mahout.classifier.naivebayes.training.TrainNaiveBayesJob.run(TrainNaiveBayesJob.java:107)
+	at org.apache.hadoop.util.ToolRunner.run(ToolRunner.java:70)
+	at org.apache.mahout.classifier.naivebayes.training.TrainNaiveBayesJob.main(TrainNaiveBayesJob.java:59)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:497)
+	at org.apache.hadoop.util.ProgramDriver$ProgramDescription.invoke(ProgramDriver.java:72)
+	at org.apache.hadoop.util.ProgramDriver.run(ProgramDriver.java:145)
+	at org.apache.hadoop.util.ProgramDriver.driver(ProgramDriver.java:153)
+	at org.apache.mahout.driver.MahoutDriver.main(MahoutDriver.java:195)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:497)
+	at org.apache.hadoop.util.RunJar.main(RunJar.java:212)
